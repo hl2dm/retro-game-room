@@ -2,11 +2,12 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#06050c">
     <title>RETRO DECK 1995 // 全 3D 沉浸式懷舊電視遊樂器展示間</title>
     <!-- Three.js r128 -->
     <script>
-(function(){function show(m){var d=document.getElementById('boot-overlay');if(!d){d=document.createElement('div');d.id='boot-overlay';d.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;background:#05060d;color:#7dd3fc;font:16px monospace;text-align:center;padding:24px';(document.body||document.documentElement).appendChild(d);}d.innerHTML=m;}
+(function(){function show(m){var d=document.getElementById('boot-overlay');if(!d){d=document.createElement('div');d.id='boot-overlay';d.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;background:#05060d;color:#7dd3fc;font:clamp(12px,3.6vw,16px)/1.5 monospace;text-align:center;word-break:break-word;padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))';(document.body||document.documentElement).appendChild(d);}d.innerHTML=m;}
 window.__bootShow=show;
 window.addEventListener('error',function(e){show('<b style="color:#f87171">⚠ 載入失敗 / Script error</b><br><br>'+(e.message||e)+'<br><br>請用 Chrome / Edge 開啟，並確認已啟用硬體加速 (WebGL)。');});
 document.addEventListener('DOMContentLoaded',function(){show('LOADING RETRO ROOM...');
@@ -35,14 +36,22 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             -webkit-user-select: none;
         }
         html, body {
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
+            position: fixed;
+            inset: 0;
+            overscroll-behavior: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
             background-color: #06050c;
         }
         #webgl-container {
-            width: 100vw;
-            height: 100vh;
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
             display: block;
             cursor: grab;
         }
@@ -1193,6 +1202,23 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
         let orbitAzimuth = 0;
         let orbitElevation = 0;
         let hoveredInteractive = null;
+        // ---- RWD / touch helpers ----
+        const IS_TOUCH = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window && navigator.maxTouchPoints > 0);
+        const IS_SMALL = Math.min(screen.width, screen.height) < 820;
+        const MOBILE_LITE = IS_TOUCH && IS_SMALL;
+        function viewW() { return window.innerWidth || document.documentElement.clientWidth; }
+        function viewH() { return window.innerHeight || document.documentElement.clientHeight; }
+        // 依直/橫向調整 FOV 與鏡頭距離倍率，讓直式螢幕也能同時看到電視、展示架與收藏箱
+        let camFitScale = 1;
+        function applyResponsiveCamera() {
+            const aspect = viewW() / viewH();
+            const fov = aspect < 1 ? 55 : (aspect < 1.3 ? 48 : 42);
+            camera.fov = fov;
+            camera.aspect = aspect;
+            camera.updateProjectionMatrix();
+            const need = (Math.tan(THREE.MathUtils.degToRad(21)) * 1.6) / (Math.tan(THREE.MathUtils.degToRad(fov / 2)) * aspect);
+            camFitScale = Math.max(1, Math.min(2.6, need));
+        }
 
         function initThreeWorld() {
             const container = document.getElementById('webgl-container');
@@ -1204,11 +1230,12 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 100);
             camera.position.copy(camTargetPos);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer = new THREE.WebGLRenderer({ antialias: !MOBILE_LITE || window.devicePixelRatio < 2, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MOBILE_LITE ? 1.75 : 2));
+            renderer.setSize(viewW(), viewH());
             renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.shadowMap.type = MOBILE_LITE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+            applyResponsiveCamera();
             container.appendChild(renderer.domElement);
 
             setupRoomLighting();
@@ -1222,6 +1249,8 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             preloadConfiguredCustomAssets(); // 載入 CUSTOM_ASSET_CONFIG 內設定的圖片
             setup3DRaycasterAndOrbit(container);
             window.addEventListener('resize', onResize);
+            window.addEventListener('orientationchange', () => setTimeout(onResize, 250));
+            if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
         }
 
         function setupRoomLighting() {
@@ -1231,8 +1260,8 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             const keyLight = new THREE.DirectionalLight(0xfff2e0, 1.15);
             keyLight.position.set(4, 11, 8);
             keyLight.castShadow = true;
-            keyLight.shadow.mapSize.width = 2048;
-            keyLight.shadow.mapSize.height = 2048;
+            keyLight.shadow.mapSize.width = MOBILE_LITE ? 1024 : 2048;
+            keyLight.shadow.mapSize.height = MOBILE_LITE ? 1024 : 2048;
             const d = 8.5;
             keyLight.shadow.camera.left = -d;
             keyLight.shadow.camera.right = d;
@@ -2199,7 +2228,40 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 setDiegeticCameraFocus('overview');
             });
 
+            const activePointers = new Map();
+            let pinchStartDist = 0, pinchStartCamDist = 0, wasPinching = false, audioUnlocked = false;
+            const unlockAudio = () => {
+                if (audioUnlocked) return;
+                try {
+                    SFX.init();
+                    if (SFX.ctx) { const b = SFX.ctx.createBuffer(1, 1, 22050); const src = SFX.ctx.createBufferSource(); src.buffer = b; src.connect(SFX.ctx.destination); src.start(0); }
+                    audioUnlocked = !!SFX.ctx && SFX.ctx.state !== 'suspended';
+                } catch (err) {}
+            };
+            ['touchend', 'pointerup', 'click'].forEach(t => window.addEventListener(t, unlockAudio, { passive: true }));
+            const camDistNow = () => camTargetPos.distanceTo(camTargetLook);
+            const setCamDist = d => { const dir = camTargetPos.clone().sub(camTargetLook).normalize(); camTargetPos.copy(camTargetLook).add(dir.multiplyScalar(Math.max(3.2, Math.min(12.5, d)))); };
+            const pinchDist = () => { const p = [...activePointers.values()]; return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); };
+            // 手機上小物件較難點中：中心沒打到時，在半徑內環狀取樣放寬判定
+            function pickAt(cx, cy, tolerant) {
+                const offs = [[0, 0]];
+                if (tolerant) { for (const r of [12, 24]) for (let a = 0; a < 8; a++) offs.push([Math.cos(a * Math.PI / 4) * r, Math.sin(a * Math.PI / 4) * r]); }
+                for (const [ox, oy] of offs) {
+                    pointer.x = ((cx + ox) / viewW()) * 2 - 1;
+                    pointer.y = -((cy + oy) / viewH()) * 2 + 1;
+                    raycaster.setFromCamera(pointer, camera);
+                    const hit = raycaster.intersectObjects(interactiveMeshes, false).find(i => isVisibleInHierarchy(i.object));
+                    if (hit && hit.object.userData && (ox === 0 && oy === 0 || hit.object.userData.type !== 'desk_bg')) return hit;
+                }
+                return null;
+            }
             container.addEventListener('pointerdown', e => {
+                if (e.pointerType === 'touch') {
+                    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                    if (activePointers.size === 2) { wasPinching = true; isPointerDragging = false; pinchStartDist = pinchDist(); pinchStartCamDist = camDistNow(); return; }
+                    if (activePointers.size > 2) return;
+                    wasPinching = false;
+                }
                 if (e.button !== 0) return;
                 isPointerDragging = true;
                 pointerDownPos.x = e.clientX;
@@ -2209,6 +2271,11 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             });
 
             window.addEventListener('pointermove', e => {
+                if (e.pointerType === 'touch') {
+                    if (activePointers.has(e.pointerId)) activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+                    if (activePointers.size >= 2) { const d = pinchDist(); if (pinchStartDist > 0) setCamDist(pinchStartCamDist * pinchStartDist / d); diegeticTagSprite.visible = false; return; }
+                    if (!isPointerDragging) return; // 觸控無 hover
+                }
                 const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
 
                 if (isPointerDragging && moveDist > 5) {
@@ -2259,19 +2326,27 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 }
             });
 
+            const endTouch = e => { if (e.pointerType === 'touch') activePointers.delete(e.pointerId); };
+            window.addEventListener('pointercancel', e => { endTouch(e); isPointerDragging = false; });
             window.addEventListener('pointerup', e => {
+                const isTouch = e.pointerType === 'touch';
+                if (isTouch) { const multi = activePointers.size > 1 || wasPinching; endTouch(e); if (multi) { if (activePointers.size === 0) wasPinching = false; isPointerDragging = false; return; } }
                 if (e.button !== 0) return;
                 const dragDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
                 isPointerDragging = false;
 
                 // Only trigger 3D click if pointer didn't drag
-                if (dragDist < 7) {
-                    pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-                    pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
-                    raycaster.setFromCamera(pointer, camera);
-
-                    const intersects = raycaster.intersectObjects(interactiveMeshes, false);
-                    const hit = intersects.find(i => isVisibleInHierarchy(i.object));
+                if (dragDist < (isTouch ? 12 : 7)) {
+                    const hit = pickAt(e.clientX, e.clientY, isTouch);
+                    if (isTouch && hit && hit.object.userData && hit.object.userData.tagTitle) {
+                        // 觸控：點擊時顯示原本 hover 才出現的 3D 標籤
+                        const d = hit.object.userData, wp = new THREE.Vector3();
+                        updateDiegeticTagText(d.tagTitle, d.tagSub || '', d.accent || '#00f0ff');
+                        hit.object.getWorldPosition(wp);
+                        diegeticTagSprite.position.set(wp.x, wp.y + 0.92, wp.z + 0.25);
+                        diegeticTagSprite.visible = true;
+                        clearTimeout(window.__tagHideT); window.__tagHideT = setTimeout(() => { diegeticTagSprite.visible = false; }, 2500);
+                    } else if (isTouch) diegeticTagSprite.visible = false;
 
                     if (hit && hit.object.userData) {
                         handle3DObjectClick(hit.object.userData);
@@ -2384,9 +2459,9 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
 
         function onResize() {
             if (!camera || !renderer) return;
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            applyResponsiveCamera();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MOBILE_LITE ? 1.75 : 2));
+            renderer.setSize(viewW(), viewH());
         }
 
         /*************************************************************************
@@ -2430,7 +2505,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             }
 
             // 5. Smooth Damped Orbit Camera Update
-            const offset = camTargetPos.clone().sub(camTargetLook);
+            const offset = camTargetPos.clone().sub(camTargetLook).multiplyScalar(camFitScale);
             offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), orbitAzimuth);
             const finalCamPos = camTargetLook.clone().add(offset);
             finalCamPos.y += orbitElevation * 3.2;
