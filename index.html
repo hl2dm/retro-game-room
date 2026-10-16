@@ -94,7 +94,9 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 n64_sm64:      { labelImageUrl: 'assets/n64_sm64_label.webp', screenImageUrl: 'assets/n64_sm64_screen.webp' }, // N64 卡帶 1
                 n64_zelda:     { labelImageUrl: 'assets/n64_zelda_label.webp', screenImageUrl: 'assets/n64_zelda_screen.webp' }, // N64 卡帶 2
                 ps2_srwa3:     { labelImageUrl: 'assets/ps2_srwa3_label.webp', screenImageUrl: 'assets/ps2_srwa3_screen.webp' }, // PS2 DVD 1
-                ps2_shutoko01: { labelImageUrl: 'assets/ps2_shutoko01_label.webp', screenImageUrl: 'assets/ps2_shutoko01_screen.webp' }  // PS2 DVD 2
+                ps2_shutoko01: { labelImageUrl: 'assets/ps2_shutoko01_label.webp', screenImageUrl: 'assets/ps2_shutoko01_screen.webp' }, // PS2 DVD 2
+                x360_orbital:  { labelImageUrl: 'assets/x360_orbital_label.webp', screenImageUrl: 'assets/x360_orbital_screen.webp' }, // X360 DVD 1
+                x360_ironcog:  { labelImageUrl: 'assets/x360_ironcog_label.webp', screenImageUrl: 'assets/x360_ironcog_screen.webp' }  // X360 DVD 2
             }
         };
         /*************************************************************************
@@ -103,29 +105,38 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
         const CONSOLE_SPECS = {
             sega: {
                 id: 'sega', name: 'SEGA MEGA DRIVE 16-BIT', shortName: 'MEGA DRIVE', mediaType: 'md',
-                shelfSlotY: 3.21, badgeColor: '#3b82f6',
+                shelfSlotY: 5.81, badgeColor: '#3b82f6',
                 plate: ['SEGA MEGA DRIVE', 'CPU 68000 7.6MHz + Z80 // 1988 // 16-BIT ROM 卡帶'],
                 slot: new THREE.Vector3(0.08, 0.86, -0.08)
             },
             sfc: {
                 id: 'sfc', name: '超級任天堂 SUPER FAMICOM', shortName: 'SUPER FAMICOM', mediaType: 'sfc',
-                shelfSlotY: 2.26, badgeColor: '#a855f7',
+                shelfSlotY: 4.86, badgeColor: '#a855f7',
                 plate: ['SUPER FAMICOM', 'CPU 65C816 3.58MHz // 1990 // 16-BIT ROM 卡帶'],
                 slot: new THREE.Vector3(0, 0.84, -0.36)
             },
             n64: {
                 id: 'n64', name: 'NINTENDO 64', shortName: 'NINTENDO 64', mediaType: 'n64',
-                shelfSlotY: 1.31, badgeColor: '#22c55e',
+                shelfSlotY: 3.91, badgeColor: '#22c55e',
                 plate: ['NINTENDO 64', 'CPU VR4300 93.75MHz // 1996 // 64-BIT ROM 卡帶'],
                 slot: new THREE.Vector3(0, 0.88, -0.22)
             },
             ps2: {
                 id: 'ps2', name: 'PlayStation 2 128-BIT', shortName: 'PlayStation 2', mediaType: 'ps2',
                 shelfSlotY: 0.36, badgeColor: '#00f0ff',
-                plate: ['PlayStation 2', 'Emotion Engine 294MHz // 2000 // DVD-ROM 光碟'],
-                slot: new THREE.Vector3(0, 0.36, 1.45) // 托盤滑出時的光碟位置
+                plate: ['PlayStation 2 (Ceramic White)', 'Emotion Engine 294MHz // 2000 // DVD-ROM 光碟・直立'],
+                slot: new THREE.Vector3(0, 0.36, 1.45), // 托盤滑出時的光碟位置
+                deckOffset: new THREE.Vector3(-2.6, 0, 0.55) // 直立擺在電視左前方，避免擋住螢幕
+            },
+            x360: {
+                id: 'x360', name: 'Xbox 360 HD-ERA', shortName: 'Xbox 360', mediaType: 'x360',
+                shelfSlotY: 2.96, badgeColor: '#22c55e',
+                plate: ['Xbox 360', 'Xenon 3.2GHz Tri-Core // 2005 // DVD-DL 光碟'],
+                slot: new THREE.Vector3(0, 0.5, 1.5)
             }
         };
+        function isDiscType(t) { return t === 'ps2' || t === 'x360'; }
+        function getDeckPos(cid) { const o = CONSOLE_SPECS[cid] && CONSOLE_SPECS[cid].deckOffset; return o ? ACTIVE_DECK_POS.clone().add(o) : ACTIVE_DECK_POS.clone(); }
 
         // 8 款致敬作品（皆為虛構致敬標題）
         const GAME_LIBRARY = [
@@ -152,7 +163,13 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
               pressStartText: 'PRESS START BUTTON', copyright: '© 2003 ALPHA FINAL HOMAGE', melody: [349.23, 440.0, 523.25, 698.46, 659.25, 523.25, 698.46] },
             { id: 'ps2_shutoko01', title: '首都高 Battle 01', subTitle: 'SHUTOKO BATTLE 01', year: '2003', mediaType: 'ps2', consoleTarget: 'ps2',
               badgeText: 'PS2 DVD-ROM', shellColor: 0xcbd5e1, accentColor: '#ff2a85', themeType: 'racing',
-              pressStartText: 'INSERT COIN / PRESS START', copyright: '© 2003 GENKI RACING HOMAGE', melody: [246.94, 329.63, 369.99, 493.88, 587.33, 493.88, 659.25] }
+              pressStartText: 'INSERT COIN / PRESS START', copyright: '© 2003 GENKI RACING HOMAGE', melody: [246.94, 329.63, 369.99, 493.88, 587.33, 493.88, 659.25] },
+            { id: 'x360_orbital', title: '軌道先鋒 3 致敬版', subTitle: 'ORBITAL VANGUARD 3', year: '2007', mediaType: 'x360', consoleTarget: 'x360',
+              badgeText: 'X360 DVD-DL', shellColor: 0x15803d, accentColor: '#22c55e', themeType: 'space',
+              pressStartText: 'PRESS START', copyright: '© 2007 RING WORLD HOMAGE', melody: [293.66, 349.23, 440.0, 392.0, 349.23, 293.66, 587.33] },
+            { id: 'x360_ironcog', title: '鋼齒戰爭 致敬版', subTitle: 'IRON COG WAR', year: '2006', mediaType: 'x360', consoleTarget: 'x360',
+              badgeText: 'X360 DVD-DL', shellColor: 0x15803d, accentColor: '#dc2626', themeType: 'cyber',
+              pressStartText: 'PRESS START', copyright: '© 2006 COG HOMAGE STUDIO', melody: [196.0, 233.08, 293.66, 261.63, 233.08, 196.0, 293.66] }
         ];
 
         /*************************************************************************
@@ -346,7 +363,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 if (STATE.muted) return;
                 this.init();
                 if (!this.ctx) return;
-                const wave = { sega: 'square', sfc: 'triangle', n64: 'triangle', ps2: 'sine' }[STATE.activeConsoleId] || 'square';
+                const wave = { sega: 'square', sfc: 'triangle', n64: 'triangle', ps2: 'sine', x360: 'sawtooth' }[STATE.activeConsoleId] || 'square';
                 const seq = notes || [261.63, 329.63, 392.00, 523.25];
                 seq.forEach((freq, idx) => {
                     this._tone(wave, freq, this.ctx.currentTime + idx * 0.11, 0.24, 0.12);
@@ -358,6 +375,19 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 this.init();
                 if (!this.ctx) return;
                 const c = this.ctx, t = c.currentTime;
+                if (consoleId === 'x360') {
+                    // X360：濾波白噪音「呼嘯」上揚 + 明亮綠色和弦 pad
+                    const len = Math.floor(c.sampleRate * 1.6), buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+                    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / len);
+                    const n = c.createBufferSource(); n.buffer = buf;
+                    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.4;
+                    f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(4200, t + 1.3);
+                    const g = c.createGain(); g.gain.value = 0.18;
+                    n.connect(f); f.connect(g); g.connect(c.destination); n.start(t);
+                    [523.25, 659.25, 783.99, 1046.5].forEach((fr, i) => this._tone('sine', fr, t + 1.0 + i * 0.06, 1.6, 0.06));
+                    this._tone('triangle', 261.63, t + 1.0, 1.8, 0.07);
+                    return;
+                }
                 if (consoleId === 'sega') {
                     // 「SE-GA」雙音合唱：多支微失諧鋸齒波 + 帶通濾波模擬人聲
                     [[466.16, 0.0, 0.28, 1400], [311.13, 0.30, 0.55, 900]].forEach(([f, st, d, formant]) => {
@@ -631,6 +661,39 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             const ctx = crtCtx;
             ctx.fillStyle = '#03050a';
             ctx.fillRect(0, 0, w, h);
+            if (consoleId === 'x360') {
+                // 綠色光球 + 旋轉光帶開機動畫（原創風格）
+                const bg = ctx.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w * 0.7);
+                bg.addColorStop(0, '#f4fff4'); bg.addColorStop(0.35, '#d9f5d9'); bg.addColorStop(1, '#8fbf8f');
+                ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+                const grow = Math.min(1, elapsed / 1.2), cx = w / 2, cy = h * 0.47;
+                ctx.save(); ctx.translate(cx, cy);
+                for (let i = 0; i < 9; i++) {
+                    ctx.save();
+                    ctx.rotate(time * (0.6 + i * 0.12) + i * 0.7);
+                    ctx.strokeStyle = `rgba(${40 + i * 10},${170 + i * 8},${40},${0.35 + 0.05 * i})`;
+                    ctx.lineWidth = 3 + (i % 3) * 2;
+                    ctx.beginPath(); ctx.ellipse(0, 0, (120 + i * 14) * grow, (30 + i * 6) * grow, 0, 0, Math.PI * 2); ctx.stroke();
+                    ctx.restore();
+                }
+                const orb = ctx.createRadialGradient(-18, -22, 6, 0, 0, 78 * grow + 1);
+                orb.addColorStop(0, '#eaffea'); orb.addColorStop(0.35, '#6fdc5a'); orb.addColorStop(1, '#0f6b1a');
+                ctx.fillStyle = orb; ctx.beginPath(); ctx.arc(0, 0, 78 * grow + 1, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 9 * grow;
+                ctx.beginPath(); ctx.moveTo(-34 * grow, -34 * grow); ctx.quadraticCurveTo(0, 0, 34 * grow, 34 * grow);
+                ctx.moveTo(34 * grow, -34 * grow); ctx.quadraticCurveTo(0, 0, -34 * grow, 34 * grow); ctx.stroke();
+                ctx.restore();
+                if (elapsed > 1.2) {
+                    ctx.globalAlpha = Math.min(1, (elapsed - 1.2) / 0.6);
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = '#2f3b2f'; ctx.font = '300 34px "Segoe UI", "Noto Sans TC", sans-serif';
+                    ctx.fillText('Xbox 360', w / 2, h * 0.82);
+                    ctx.fillStyle = '#3f6b3f'; ctx.font = 'bold 16px "DotGothic16", monospace';
+                    ctx.fillText(`DVD-DL // ${game.title}`, w / 2, h * 0.92);
+                    ctx.globalAlpha = 1;
+                }
+                return;
+            }
             ctx.textAlign = 'center';
 
             if (consoleId === 'sega') {
@@ -936,7 +999,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
 
             ctx.clearRect(0, 0, 512, 512);
 
-            if (game.mediaType === 'ps2') {
+            if (isDiscType(game.mediaType)) {
                 // PS2 DVD-ROM Circular Disc Surface Rendering
                 ctx.fillStyle = '#0b1021';
                 ctx.fillRect(0, 0, 512, 512);
@@ -1186,9 +1249,9 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
 
         // Camera Presets & Smooth Orbit Variables
         const CAM_VIEWS = {
-            overview: { pos: new THREE.Vector3(0, 5.4, 9.2),  look: new THREE.Vector3(0, 1.85, -0.2) },
+            overview: { pos: new THREE.Vector3(0, 6.4, 10.6),  look: new THREE.Vector3(0, 2.3, -0.2) },
             tv:       { pos: new THREE.Vector3(0, 3.0, 4.3),  look: new THREE.Vector3(0, 2.1, -1.6) },
-            shelf:    { pos: new THREE.Vector3(-2.4, 4.0, 6.0), look: new THREE.Vector3(-4.2, 2.1, 0.25) },
+            shelf:    { pos: new THREE.Vector3(-2.2, 4.6, 8.4), look: new THREE.Vector3(-4.2, 3.4, 0.25) },
             crate:    { pos: new THREE.Vector3(2.8, 3.6, 5.2),  look: new THREE.Vector3(4.1, 1.0, 0.55) }
         };
 
@@ -1474,13 +1537,13 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             const plateMetal = new THREE.MeshStandardMaterial({ color: 0xa1a1aa, roughness: 0.25, metalness: 0.85 });
 
             [[-1.4, -1.05], [1.4, -1.05], [-1.4, 1.05], [1.4, 1.05]].forEach(([px, pz]) => {
-                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 4.5, 16), metalMat);
-                post.position.set(px, 2.25, pz);
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 7.1, 16), metalMat);
+                post.position.set(px, 3.55, pz);
                 post.castShadow = true;
                 rackGroup.add(post);
             });
 
-            const tierOrder = ['ps2', 'n64', 'sfc', 'sega']; // 由下而上
+            const tierOrder = ['ps2', 'x360', 'n64', 'sfc', 'sega']; // 由下而上（PS2 直立需較高層）
             tierOrder.forEach(cid => {
                 const spec = CONSOLE_SPECS[cid];
                 const ty = spec.shelfSlotY - 0.06;
@@ -1488,7 +1551,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 plank.position.set(0, ty, 0);
                 plank.castShadow = true;
                 plank.receiveShadow = true;
-                plank.userData = { type: 'focus_shelf', tagTitle: '左側：四層主機展示架', tagSub: '點擊架上主機即可與電視前主機交換', accent: '#ff2a85' };
+                plank.userData = { type: 'focus_shelf', tagTitle: '左側：五層主機展示架', tagSub: '點擊架上主機即可與電視前主機交換', accent: '#ff2a85' };
                 interactiveMeshes.push(plank);
                 rackGroup.add(plank);
 
@@ -1507,10 +1570,10 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
 
             const signTex = createPrintedSignTexture('電視遊樂器展示架', 'SELECT CONSOLE TO SWAP', '#ff2a85');
             const signBoard = new THREE.Mesh(new THREE.BoxGeometry(2.85, 0.55, 0.1), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-            signBoard.position.set(0, 4.35, 0);
+            signBoard.position.set(0, 6.95, 0);
             rackGroup.add(signBoard);
             const signFace = new THREE.Mesh(new THREE.PlaneGeometry(2.75, 0.48), new THREE.MeshBasicMaterial({ map: signTex }));
-            signFace.position.set(0, 4.35, 0.06);
+            signFace.position.set(0, 6.95, 0.06);
             rackGroup.add(signFace);
 
             scene.add(rackGroup);
@@ -1814,49 +1877,104 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             consoleParts.n64 = { powerBtn: n64Power, ejectBtn: n64Flap, resetBtn: n64Reset, led: n64Led,
                 powerOnPos: new THREE.Vector3(-0.78, 0.455, -0.16), powerOffPos: new THREE.Vector3(-0.78, 0.455, -0.04), ledColor: 0xff2a2a };
 
-            // ================= PlayStation 2（初期型 SCPH-30000）301×182×78 =================
+            // ================= PlayStation 2 Ceramic White（初期型）301×182×78，直立擺放 =================
             const ps2 = new THREE.Group();
-            const W4 = 301 * MM, D4 = 182 * MM;          // 2.41 × 1.46
-            const ps2Black = new THREE.MeshStandardMaterial({ color: 0x111216, roughness: 0.7, metalness: 0.05 });
-            const ps2Gloss = new THREE.MeshStandardMaterial({ color: 0x0a0b0e, roughness: 0.3, metalness: 0.2 });
-            const ps2Groove = new THREE.MeshStandardMaterial({ color: 0x030304, roughness: 0.9 });
+            const W4 = 301 * MM, D4 = 182 * MM, H4 = 78 * MM; // 2.41 × 1.46 × 0.62
+            const ps2White = new THREE.MeshStandardMaterial({ color: 0xe9e9e6, roughness: 0.55, metalness: 0.02 });
+            const ps2Gloss = new THREE.MeshStandardMaterial({ color: 0xf6f6f4, roughness: 0.25, metalness: 0.05 });
+            const ps2Groove = new THREE.MeshStandardMaterial({ color: 0x9c9ea3, roughness: 0.8 });
+            const ps2Port = new THREE.MeshStandardMaterial({ color: 0x2a2b30, roughness: 0.8 });
             const fz = D4 / 2;
-            rbox(W4, 0.29, D4, 0.03, 0.012, ps2Black, ps2);                         // 下層
-            box(W4 - 0.05, 0.05, D4 - 0.05, ps2Groove, 0, 0.31, 0, ps2);            // 中間分層凹槽
-            rbox(W4, 0.29, D4, 0.03, 0.012, ps2Black, ps2, 0, 0.33, 0);             // 上層
-            // 頂部細溝紋
-            for (let i = 0; i < 26; i++) box(W4 - 0.12, 0.003, 0.012, ps2Groove, 0, 0.621, -fz + 0.1 + i * 0.05, ps2);
-            // 兩側百葉散熱孔
-            [-1, 1].forEach(s => { for (let i = 0; i < 9; i++) { const v = box(0.012, 0.018, 1.1, ps2Groove, s * (W4 / 2 + 0.002), 0.06 + i * 0.026, 0, ps2); v.rotation.x = 0; } for (let i = 0; i < 9; i++) box(0.012, 0.018, 1.1, ps2Groove, s * (W4 / 2 + 0.002), 0.39 + i * 0.024, 0, ps2); });
-            // 正面右側直條控制區（上層）
-            box(0.36, 0.27, 0.01, ps2Gloss, 1.0, 0.475, fz + 0.004, ps2);
-            for (let i = 0; i < 5; i++) box(1.95, 0.004, 0.006, ps2Groove, -0.2, 0.36 + i * 0.012, fz + 0.004, ps2);
-            // 電動光碟托盤（上層左側開口，前蓋印 PlayStation 2 字樣）
-            box(1.66, 0.07, 0.02, ps2Groove, -0.3, 0.45, fz - 0.005, ps2);
+            // 直立架（底座）
+            rbox(0.95, 0.05, 1.62, 0.06, 0.012, new THREE.MeshStandardMaterial({ color: 0xd8d8d5, roughness: 0.5 }), ps2, 0, 0, 0);
+            // 機身：先以橫放座標建模，再整體繞 Z 旋轉 90°（右側按鍵端朝上）
+            const ps2Body = new THREE.Group();
+            rbox(W4, 0.29, D4, 0.03, 0.012, ps2White, ps2Body);
+            box(W4 - 0.05, 0.05, D4 - 0.05, ps2Groove, 0, 0.31, 0, ps2Body);
+            rbox(W4, 0.29, D4, 0.03, 0.012, ps2White, ps2Body, 0, 0.33, 0);
+            for (let i = 0; i < 26; i++) box(W4 - 0.12, 0.003, 0.012, ps2Groove, 0, 0.621, -fz + 0.1 + i * 0.05, ps2Body);
+            [-1, 1].forEach(s => { for (let i = 0; i < 9; i++) box(0.012, 0.018, 1.1, ps2Groove, s * (W4 / 2 + 0.002), 0.06 + i * 0.026, 0, ps2Body); for (let i = 0; i < 9; i++) box(0.012, 0.018, 1.1, ps2Groove, s * (W4 / 2 + 0.002), 0.39 + i * 0.024, 0, ps2Body); });
+            box(0.36, 0.27, 0.01, ps2Gloss, 1.0, 0.475, fz + 0.004, ps2Body);
+            for (let i = 0; i < 5; i++) box(1.95, 0.004, 0.006, ps2Groove, -0.2, 0.36 + i * 0.012, fz + 0.004, ps2Body);
+            box(1.66, 0.07, 0.02, ps2Port, -0.3, 0.45, fz - 0.005, ps2Body);
             const tray = new THREE.Group();
-            box(1.6, 0.025, 1.3, new THREE.MeshStandardMaterial({ color: 0x1a1b20, roughness: 0.6 }), 0, 0, 0, tray);
-            const well = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.01, 48), new THREE.MeshStandardMaterial({ color: 0x24252b, roughness: 0.5 }));
+            box(1.6, 0.025, 1.3, new THREE.MeshStandardMaterial({ color: 0x2a2b30, roughness: 0.6 }), 0, 0, 0, tray);
+            const well = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.01, 48), new THREE.MeshStandardMaterial({ color: 0x3a3b42, roughness: 0.5 }));
             well.position.y = 0.016; tray.add(well);
-            box(1.64, 0.066, 0.03, ps2Black, 0, 0.0, 0.66, tray);
-            decal(0.7, 0.05, 512, (ctx, w, h) => { text(ctx, 'PlayStation 2', w / 2, h / 2, '500 34px "Segoe UI", Arial', '#cbd5e1'); }, tray, -0.35, 0.0, 0.677, 0);
+            box(1.64, 0.066, 0.03, ps2White, 0, 0.0, 0.66, tray);
+            const trayText = decal(0.7, 0.05, 512, (ctx, w, h) => { text(ctx, 'PlayStation 2', w / 2, h / 2, '500 34px "Segoe UI", Arial', '#6b7280'); }, tray, -0.35, 0.0, 0.677, 0);
             tray.position.set(-0.3, 0.45, 0.08);
-            ps2.add(tray);
-            // 右側：RESET（綠/紅 LED）與 EJECT（藍 LED）
-            const ps2Power = rbox(0.13, 0.06, 0.03, 0.01, 0.006, new THREE.MeshStandardMaterial({ color: 0x23252b, roughness: 0.4 }), ps2, 1.06, 0.53, fz + 0.002);
-            const ps2Eject = rbox(0.13, 0.05, 0.03, 0.01, 0.006, new THREE.MeshStandardMaterial({ color: 0x23252b, roughness: 0.4 }), ps2, 1.06, 0.4, fz + 0.002);
-            const ps2LedB = led(0x22c55e, 0.93, 0.56, fz + 0.012, ps2, 0.016);
-            const ps2LedG = led(0x3b82f6, 0.93, 0.425, fz + 0.012, ps2, 0.016);
-            decal(0.2, 0.2, 128, (ctx, w, h) => { ctx.fillStyle = '#2f6fe0'; ctx.font = 'italic 900 70px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PS', w / 2, h / 2); }, ps2, 1.0, 0.36 + 0.006, fz + 0.012, 0);
-            // 下層正面：2 手把孔 + 2 記憶卡槽 + USB / i.LINK
-            [-0.85, -0.4].forEach(x => { box(0.24, 0.07, 0.01, ps2Groove, x, 0.2, fz + 0.004, ps2); box(0.24, 0.025, 0.01, ps2Groove, x, 0.08, fz + 0.004, ps2); });
-            [0.5, 0.62].forEach(x => box(0.07, 0.03, 0.01, ps2Groove, x, 0.14, fz + 0.004, ps2));
-            box(0.06, 0.03, 0.01, ps2Groove, 0.8, 0.14, fz + 0.004, ps2);
-            decal(0.6, 0.04, 512, (ctx, w, h) => { text(ctx, 'CONTROLLER   MEMORY CARD', w / 2, h / 2, '20px Arial', '#64748b'); }, ps2, -0.62, 0.27, fz + 0.006, 0);
+            ps2Body.add(tray);
+            const ps2Power = rbox(0.13, 0.06, 0.03, 0.01, 0.006, ps2Gloss, ps2Body, 1.06, 0.53, fz + 0.002);
+            const ps2Eject = rbox(0.13, 0.05, 0.03, 0.01, 0.006, ps2Gloss, ps2Body, 1.06, 0.4, fz + 0.002);
+            const ps2LedB = led(0x22c55e, 0.93, 0.56, fz + 0.012, ps2Body, 0.016);
+            const ps2LedG = led(0x3b82f6, 0.93, 0.425, fz + 0.012, ps2Body, 0.016);
+            // 直立時 PS 標誌轉正
+            const psLogo = decal(0.2, 0.2, 128, (ctx, w, h) => { ctx.fillStyle = '#2f6fe0'; ctx.font = 'italic 900 70px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PS', w / 2, h / 2); }, ps2Body, 1.0, 0.36 + 0.006, fz + 0.012, 0);
+            psLogo.rotation.z = -Math.PI / 2;
+            [-0.85, -0.4].forEach(x => { box(0.24, 0.07, 0.01, ps2Port, x, 0.2, fz + 0.004, ps2Body); box(0.24, 0.025, 0.01, ps2Port, x, 0.08, fz + 0.004, ps2Body); });
+            [0.5, 0.62].forEach(x => box(0.07, 0.03, 0.01, ps2Port, x, 0.14, fz + 0.004, ps2Body));
+            box(0.06, 0.03, 0.01, ps2Port, 0.8, 0.14, fz + 0.004, ps2Body);
+            ps2Body.rotation.z = Math.PI / 2;               // 直立：原右側（按鍵端）朝上
+            ps2Body.position.set(H4 / 2, W4 / 2 + 0.05, 0); // 站在直立架上
+            ps2.add(ps2Body);
             consoleParts.ps2 = { powerBtn: ps2Power, ejectBtn: ps2Eject, resetBtn: undefined, led: ps2LedB, led2: ps2LedG, tray,
                 trayClosedZ: 0.08, trayOpenZ: 1.25,
                 powerOnPos: new THREE.Vector3(1.06, 0.53, fz - 0.008), powerOffPos: new THREE.Vector3(1.06, 0.53, fz + 0.002), ledColor: 0x22c55e };
 
-            [['sega', md], ['sfc', sfc], ['n64', n64], ['ps2', ps2]].forEach(([cid, grp]) => {
+            // ================= Xbox 360（初代）309×258×83，橫放 =================
+            const x360 = new THREE.Group();
+            const W5 = 309 * MM, D5 = 258 * MM, H5 = 83 * MM; // 2.47 × 2.06 × 0.66
+            const xWhite = new THREE.MeshStandardMaterial({ color: 0xf1f1ef, roughness: 0.4, metalness: 0.02 });
+            const xGrey = new THREE.MeshStandardMaterial({ color: 0xc9cacc, roughness: 0.45 });
+            const xChrome = new THREE.MeshStandardMaterial({ color: 0xd7dbe0, roughness: 0.12, metalness: 0.9 });
+            const xDark = new THREE.MeshStandardMaterial({ color: 0x1b1c1f, roughness: 0.7 });
+            // 機身：正面輪廓（上下兩面向內凹）沿 Z 擠出
+            {
+                const s = new THREE.Shape(), hw = W5 / 2 - 0.03, hh = H5;
+                s.moveTo(-hw, 0.03); s.quadraticCurveTo(0, 0.07, hw, 0.03); s.lineTo(hw, hh - 0.03);
+                s.quadraticCurveTo(0, hh - 0.09, -hw, hh - 0.03); s.lineTo(-hw, 0.03);
+                const g = new THREE.ExtrudeGeometry(s, { depth: D5 - 0.06, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 4, curveSegments: 20 });
+                g.translate(0, 0, -(D5 - 0.06) / 2);
+                add(new THREE.Mesh(g, xWhite), x360, 0, 0, 0);
+            }
+            const xf = D5 / 2 + 0.03;
+            // 正面灰色面板 + 鉻銀光碟托盤
+            box(W5 - 0.1, H5 - 0.16, 0.01, xGrey, 0, H5 / 2, xf - 0.004, x360);
+            box(1.62, 0.1, 0.02, xDark, -0.3, 0.42, xf - 0.002, x360);
+            const xTray = new THREE.Group();
+            box(1.56, 0.025, 1.3, new THREE.MeshStandardMaterial({ color: 0x2a2b30, roughness: 0.6 }), 0, 0, 0, xTray);
+            const xWell = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.01, 48), new THREE.MeshStandardMaterial({ color: 0x3a3b42, roughness: 0.5 }));
+            xWell.position.y = 0.016; xTray.add(xWell);
+            box(1.6, 0.08, 0.03, xChrome, 0, 0.0, 0.66, xTray);
+            xTray.position.set(-0.3, 0.42, xf - 0.68);
+            x360.add(xTray);
+            const xEject = rbox(0.08, 0.05, 0.02, 0.01, 0.005, xChrome, x360, 0.62, 0.42, xf);
+            // 光環電源鍵：中央白鍵 + 四象限綠燈
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0x22ff55 });
+            const ringGroup = new THREE.Group();
+            for (let i = 0; i < 4; i++) {
+                const q = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.016, 8, 16, Math.PI / 2 - 0.18), ringMat);
+                q.rotation.z = i * Math.PI / 2 + 0.09; ringGroup.add(q);
+            }
+            ringGroup.position.set(0.9, 0.36, xf + 0.008); x360.add(ringGroup);
+            add(new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.01, 40), xChrome), x360, 0.9, 0.36, xf - 0.002).rotation.x = Math.PI / 2;
+            const xPower = add(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.08, 0.03, 32), xWhite), x360, 0.9, 0.36, xf + 0.01);
+            xPower.rotation.x = Math.PI / 2;
+            // 右下 USB 蓋 + 無線同步鍵
+            rbox(0.36, 0.08, 0.015, 0.02, 0.004, xGrey, x360, 0.85, 0.12, xf);
+            add(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.01, 16), xWhite), x360, 0.45, 0.36, xf).rotation.x = Math.PI / 2;
+            // 兩側圓孔散熱格柵
+            [-1, 1].forEach(sd => decal(1.6, 0.42, 512, (ctx, w, h) => {
+                ctx.fillStyle = '#9ea1a6';
+                for (let yy = 10; yy < h - 6; yy += 14) for (let xx = 10 + ((yy / 14) % 2) * 7; xx < w - 6; xx += 14) { ctx.beginPath(); ctx.arc(xx, yy, 4, 0, Math.PI * 2); ctx.fill(); }
+            }, x360, sd * (W5 / 2 + 0.005), H5 / 2, -0.1, 0, sd * Math.PI / 2));
+            decal(0.6, 0.06, 512, (ctx, w, h) => { text(ctx, 'XBOX 360', w / 2, h / 2, '300 40px "Segoe UI", Arial', '#8a8d93'); }, x360, -0.75, 0.62, xf - 0.1);
+            consoleParts.x360 = { powerBtn: xPower, ejectBtn: xEject, led: ringGroup.children[0], tray: xTray,
+                trayClosedZ: xf - 0.68, trayOpenZ: xf + 0.6,
+                powerOnPos: new THREE.Vector3(0.9, 0.36, xf + 0.0), powerOffPos: new THREE.Vector3(0.9, 0.36, xf + 0.01), ledColor: 0x22ff55 };
+
+            [['sega', md], ['sfc', sfc], ['n64', n64], ['ps2', ps2], ['x360', x360]].forEach(([cid, grp]) => {
                 registerConsoleInteractions(grp, cid);
                 scene.add(grp);
                 consoleMeshes[cid] = grp;
@@ -1872,7 +1990,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 if (child === parts.powerBtn) {
                     child.userData = { type: 'console_power', consoleId, tagTitle: `電源 POWER [${spec.shortName}]`, tagSub: '點擊切換主機電源 ON / OFF', accent: '#22c55e' };
                 } else if (child === parts.ejectBtn) {
-                    child.userData = { type: 'console_eject', consoleId, tagTitle: `退出 EJECT [${spec.shortName}]`, tagSub: consoleId === 'ps2' ? '點擊開/關電動光碟托盤' : '點擊退出卡帶', accent: '#fbbf24' };
+                    child.userData = { type: 'console_eject', consoleId, tagTitle: `退出 EJECT [${spec.shortName}]`, tagSub: (consoleId === 'ps2' || consoleId === 'x360') ? '點擊開/關電動光碟托盤' : '點擊退出卡帶', accent: '#fbbf24' };
                 } else if (child === parts.resetBtn) {
                     child.userData = { type: 'console_reset', consoleId, tagTitle: 'RESET 重置鍵', tagSub: '點擊重新開機', accent: '#3b82f6' };
                 } else if (child === parts.volumeKnob) {
@@ -1888,7 +2006,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             Object.keys(CONSOLE_SPECS).forEach(cid => {
                 const grp = consoleMeshes[cid];
                 if (cid === STATE.activeConsoleId) {
-                    grp.position.copy(ACTIVE_DECK_POS);
+                    grp.position.copy(getDeckPos(cid));
                     grp.rotation.set(0, 0, 0);
                 } else {
                     grp.position.copy(getShelfWorldSlotPosition(cid));
@@ -1934,11 +2052,12 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
 
             // 兩排：左排 MD + SFC，右排 N64 + PS2，每排 4 片由後往前排列
             GAME_LIBRARY.forEach((game, idx) => {
-                const row = idx < 4 ? 0 : 1;
-                const k = idx % 4;
+                const perRow = Math.ceil(GAME_LIBRARY.length / 2);
+                const row = idx < perRow ? 0 : 1;
+                const k = idx % perRow;
                 const mediaMesh = build3DMediaItem(game);
-                if (game.mediaType === 'ps2') mediaMesh.scale.setScalar(0.85);
-                const localPos = new THREE.Vector3(row === 0 ? -0.64 : 0.64, 0.52 + (3 - k) * 0.3, -1.3 + k * 0.82); // 階梯式：後排較高，每片露出上緣
+                if (isDiscType(game.mediaType)) mediaMesh.scale.setScalar(0.85);
+                const localPos = new THREE.Vector3(row === 0 ? -0.64 : 0.64, 0.5 + (perRow - 1 - k) * 0.24, -1.42 + k * (2.75 / (perRow - 1))); // 階梯式：後排較高，每片露出上緣
                 localPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), -0.32);
                 const worldPos = CRATE_POS.clone().add(localPos);
                 mediaMesh.position.copy(worldPos);
@@ -1958,7 +2077,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             const group = new THREE.Group();
             const labelTex = getMediaLabelTexture(game);
 
-            if (game.mediaType !== 'ps2') {
+            if (!isDiscType(game.mediaType)) {
                 const dims = { md: [1.0, 0.8, 0.17], sfc: [1.15, 0.72, 0.19], n64: [0.95, 0.62, 0.2] }[game.mediaType];
                 const [width, height, depth] = dims;
                 const shellMat = new THREE.MeshStandardMaterial({ color: game.shellColor, roughness: game.mediaType === 'md' ? 0.3 : 0.45, metalness: 0.1 });
@@ -2070,7 +2189,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
         }
 
         function getActiveSlotWorldPos(consoleId) {
-            return ACTIVE_DECK_POS.clone().add(CONSOLE_SPECS[consoleId].slot);
+            return getDeckPos(consoleId).add(CONSOLE_SPECS[consoleId].slot);
         }
 
         // 左側展示架主機 <-> 電視前主機 雙向弧線交換
@@ -2095,7 +2214,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             const oldStartPos = oldGroup.position.clone();
             const oldEndPos = getShelfWorldSlotPosition(oldConsoleId);
             const newStartPos = newGroup.position.clone();
-            const newEndPos = ACTIVE_DECK_POS.clone();
+            const newEndPos = getDeckPos(newConsoleId);
             SFX.playSwitchClick(650);
             showTVStatusOSD(`切換主機中：${CONSOLE_SPECS[newConsoleId].name}`);
             const startTime = performance.now();
@@ -2172,9 +2291,10 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             const startPos = crateEntry.homePos.clone().add(new THREE.Vector3(0, 0.35, 0));
             insertedMediaMesh.position.copy(startPos);
             insertedMediaMesh.rotation.copy(crateEntry.homeRot);
+            insertedMediaMesh.userData.baseScale = 1;
             const startTime = performance.now();
 
-            if (game.mediaType !== 'ps2') {
+            if (!isDiscType(game.mediaType)) {
                 const slotPos = getActiveSlotWorldPos(game.consoleTarget);
                 const hover = slotPos.clone().add(new THREE.Vector3(0, 1.3, 0));
                 const duration = 900;
@@ -2196,11 +2316,21 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 return;
             }
 
-            // PS2：托盤滑出 -> 光碟落在托盤 -> 托盤載著光碟滑回
-            const parts = consoleParts.ps2;
+            // 光碟主機（PS2 直立 / X360 橫放）：托盤滑出 -> 光碟以托盤方向落入 -> 托盤載著光碟滑回
+            const parts = consoleParts[game.consoleTarget];
             const tray = parts.tray;
-            const trayOpenWorld = () => ACTIVE_DECK_POS.clone().add(new THREE.Vector3(tray.position.x, tray.position.y + 0.035, parts.trayOpenZ));
-            const above = trayOpenWorld().add(new THREE.Vector3(0, 0.9, 0));
+            const trayPose = (z) => {
+                const oz = tray.position.z; tray.position.z = z; tray.parent.updateMatrixWorld(true); tray.updateMatrixWorld(true);
+                const pos = tray.localToWorld(new THREE.Vector3(0, 0.035, 0));
+                const q = new THREE.Quaternion(); tray.getWorldQuaternion(q);
+                q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0)));
+                const n = new THREE.Vector3(0, 1, 0).applyQuaternion(tray.getWorldQuaternion(new THREE.Quaternion()));
+                tray.position.z = oz; tray.updateMatrixWorld(true);
+                return { pos, q, n };
+            };
+            const openPose = trayPose(parts.trayOpenZ);
+            const above = openPose.pos.clone().add(openPose.n.clone().multiplyScalar(0.9)).add(new THREE.Vector3(0, 0.4, 0.5));
+            const startQ = insertedMediaMesh.quaternion.clone();
             const duration = 1900;
             SFX.playCDMotorWhir();
             (function stepInsert(now) {
@@ -2209,19 +2339,19 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                     const p = t / 0.25;
                     tray.position.z = THREE.MathUtils.lerp(parts.trayClosedZ, parts.trayOpenZ, p);
                     insertedMediaMesh.position.lerpVectors(startPos, above, p);
-                    insertedMediaMesh.rotation.set(-p * Math.PI / 2, -0.32 * (1 - p), 0);
+                    insertedMediaMesh.quaternion.slerpQuaternions(startQ, openPose.q, p);
                 } else if (t < 0.6) {
                     const p = (t - 0.25) / 0.35;
                     tray.position.z = parts.trayOpenZ;
-                    insertedMediaMesh.position.lerpVectors(above, trayOpenWorld(), p);
-                    insertedMediaMesh.rotation.set(-Math.PI / 2, 0, 0);
-                    insertedMediaMesh.scale.setScalar(1 - 0.05 * p);
+                    insertedMediaMesh.position.lerpVectors(above, openPose.pos, p);
+                    insertedMediaMesh.quaternion.copy(openPose.q);
+                    insertedMediaMesh.scale.setScalar(insertedMediaMesh.userData.baseScale * (1 - 0.05 * p));
                 } else {
                     if (insertedMediaMesh.parent !== tray) {
                         tray.add(insertedMediaMesh);
                         insertedMediaMesh.position.set(0, 0.035, 0); // 精準放回托盤中心
                         insertedMediaMesh.rotation.set(-Math.PI / 2, 0, 0);
-                        insertedMediaMesh.scale.setScalar(0.95);
+                        insertedMediaMesh.scale.setScalar(insertedMediaMesh.userData.baseScale * 0.95);
                         SFX.playCDMotorWhir();
                     }
                     const p = (t - 0.6) / 0.4;
@@ -2245,7 +2375,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             pressButtonAnim(parts && parts.ejectBtn);
 
             if (!STATE.insertedGame) {
-                if (STATE.activeConsoleId === 'ps2') {
+                if (consoleParts[STATE.activeConsoleId] && consoleParts[STATE.activeConsoleId].tray) {
                     STATE.ps2TrayOpen = !STATE.ps2TrayOpen;
                     SFX.playCDMotorWhir();
                     showTVStatusOSD(STATE.ps2TrayOpen ? '光碟托盤已開啟 (OPEN)' : '光碟托盤已關閉 (CLOSE)');
@@ -2265,9 +2395,11 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             showTVStatusOSD(`退出：《${game.title}》已歸還收藏箱`);
             const crateEntry = crateItems.find(c => c.game.id === game.id);
             const endPos = crateEntry ? crateEntry.homePos.clone() : CRATE_POS.clone();
-            const isDisc = game.mediaType === 'ps2';
-            const ps2 = consoleParts.ps2;
+            const isDisc = isDiscType(game.mediaType);
+            const ps2 = consoleParts[game.consoleTarget];
             const startTime = performance.now();
+            let flyQ = null;
+            const homeQ = new THREE.Quaternion().setFromEuler(crateEntry ? crateEntry.homeRot : new THREE.Euler(-0.3, -0.32, 0));
             const duration = isDisc ? 1500 : 700;
             let flyStart = null, hoverPos = null;
             if (isDisc) SFX.playCDMotorWhir();
@@ -2281,6 +2413,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                     if (insertedMediaMesh.parent !== scene) scene.attach(insertedMediaMesh);
                     if (!flyStart) {
                         flyStart = insertedMediaMesh.position.clone();
+                        flyQ = insertedMediaMesh.quaternion.clone();
                         hoverPos = flyStart.clone().add(new THREE.Vector3(0, 1.3, 0));
                     }
                     const flyEnd = isDisc ? 0.8 : 1.0;
@@ -2290,7 +2423,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                         const q = (p - 0.35) / 0.65;
                         insertedMediaMesh.position.lerpVectors(hoverPos, endPos, q);
                         insertedMediaMesh.position.y += Math.sin(q * Math.PI) * 0.5;
-                        if (isDisc) insertedMediaMesh.rotation.set(-Math.PI / 2 * (1 - q) - 0.14 * q, -0.32 * q, 0);
+                        if (isDisc) insertedMediaMesh.quaternion.slerpQuaternions(flyQ, homeQ, q);
                         insertedMediaMesh.scale.setScalar(isDisc ? THREE.MathUtils.lerp(0.95, 0.85, q) : 1);
                     }
                     if (isDisc && t > 0.8) ps2.tray.position.z = THREE.MathUtils.lerp(ps2.trayOpenZ, ps2.trayClosedZ, (t - 0.8) / 0.2);
@@ -2614,17 +2747,19 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             });
 
             // 3. PS2 電動托盤手動開關 + 各主機電源滑動開關平滑動畫
-            const ps2p = consoleParts.ps2;
-            if (ps2p && !STATE.isBusy) {
-                const tz = (STATE.activeConsoleId === 'ps2' && STATE.ps2TrayOpen) ? ps2p.trayOpenZ : ps2p.trayClosedZ;
-                ps2p.tray.position.z += (tz - ps2p.tray.position.z) * 0.12;
-            }
+            ['ps2', 'x360'].forEach(dc => {
+                const ps2p = consoleParts[dc];
+                if (ps2p && ps2p.tray && !STATE.isBusy) {
+                    const tz = (STATE.activeConsoleId === dc && STATE.ps2TrayOpen) ? ps2p.trayOpenZ : ps2p.trayClosedZ;
+                    ps2p.tray.position.z += (tz - ps2p.tray.position.z) * 0.12;
+                }
+            });
             Object.values(consoleParts).forEach(p => {
                 if (p.powerTarget) p.powerBtn.position.lerp(p.powerTarget, 0.2);
             });
 
             // 4. PS2 光碟在托盤內旋轉
-            if (STATE.insertedGame && STATE.insertedGame.mediaType === 'ps2' && insertedMediaMesh && STATE.consolePowerOn && !STATE.isBusy) {
+            if (STATE.insertedGame && isDiscType(STATE.insertedGame.mediaType) && insertedMediaMesh && STATE.consolePowerOn && !STATE.isBusy) {
                 insertedMediaMesh.rotation.z += 0.3;
             }
 
