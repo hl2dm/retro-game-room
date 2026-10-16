@@ -1218,6 +1218,33 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             camera.updateProjectionMatrix();
             const need = (Math.tan(THREE.MathUtils.degToRad(21)) * 1.6) / (Math.tan(THREE.MathUtils.degToRad(fov / 2)) * aspect);
             camFitScale = Math.max(1, Math.min(2.6, need));
+            fitPortraitOverview(aspect);
+        }
+        const OVERVIEW_ORIG = { pos: CAM_VIEWS.overview.pos.clone(), look: CAM_VIEWS.overview.look.clone() };
+        let portraitFitActive = false;
+        // 直式：依電視+展示架+收藏箱實際包圍盒，抬高視角往下看並自動縮放到剛好填滿寬度
+        function fitPortraitOverview(aspect) {
+            const wasOverview = !STATE.cameraFocus || STATE.cameraFocus === 'overview';
+            if (aspect >= 1 || typeof interactiveMeshes === 'undefined' || !interactiveMeshes.length) {
+                if (portraitFitActive) { CAM_VIEWS.overview.pos.copy(OVERVIEW_ORIG.pos); CAM_VIEWS.overview.look.copy(OVERVIEW_ORIG.look); portraitFitActive = false; if (wasOverview) { camTargetPos.copy(OVERVIEW_ORIG.pos); camTargetLook.copy(OVERVIEW_ORIG.look); } }
+                return;
+            }
+            const box = new THREE.Box3();
+            scene.updateMatrixWorld(true);
+            interactiveMeshes.forEach(m => { const t = m.userData && m.userData.type; if (t && t !== 'desk_bg' && t !== 'lamp') box.expandByObject(m); });
+            if (box.isEmpty()) return;
+            const look = box.getCenter(new THREE.Vector3());
+            const dir = new THREE.Vector3(0, Math.sin(0.98), Math.cos(0.98)); // 約 56° 俯角
+            const pts = [];
+            for (let i = 0; i < 8; i++) pts.push(new THREE.Vector3(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z));
+            const cam = camera.clone();
+            const fits = d => { cam.position.copy(look).addScaledVector(dir, d); cam.lookAt(look); cam.updateMatrixWorld(); cam.updateProjectionMatrix(); return pts.every(p => { const v = p.clone().project(cam); return Math.abs(v.x) <= 0.97 && Math.abs(v.y) <= 0.97 && v.z < 1; }); };
+            let lo = 3, hi = 40;
+            for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid; }
+            CAM_VIEWS.overview.look.copy(look);
+            CAM_VIEWS.overview.pos.copy(look).addScaledVector(dir, hi);
+            portraitFitActive = true;
+            if (wasOverview) { camTargetPos.copy(CAM_VIEWS.overview.pos); camTargetLook.copy(CAM_VIEWS.overview.look); camCurrentLook.copy(look); }
         }
 
         function initThreeWorld() {
@@ -1246,6 +1273,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             buildRightCollectionCrate();
             buildDiegetic3DFloatingSprite();
 
+            applyResponsiveCamera(); camera.position.copy(camTargetPos);
             preloadConfiguredCustomAssets(); // 載入 CUSTOM_ASSET_CONFIG 內設定的圖片
             setup3DRaycasterAndOrbit(container);
             window.addEventListener('resize', onResize);
@@ -1836,11 +1864,11 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 const k = idx % 4;
                 const mediaMesh = build3DMediaItem(game);
                 if (game.mediaType === 'ps2') mediaMesh.scale.setScalar(0.85);
-                const localPos = new THREE.Vector3(row === 0 ? -0.64 : 0.64, 0.6 + (3 - k) * 0.06, -1.25 + k * 0.78);
+                const localPos = new THREE.Vector3(row === 0 ? -0.64 : 0.64, 0.52 + (3 - k) * 0.3, -1.3 + k * 0.82); // 階梯式：後排較高，每片露出上緣
                 localPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), -0.32);
                 const worldPos = CRATE_POS.clone().add(localPos);
                 mediaMesh.position.copy(worldPos);
-                mediaMesh.rotation.set(-0.14, -0.32, 0);
+                mediaMesh.rotation.set(-0.3, -0.32, 0);
                 mediaMesh.traverse(child => {
                     if (child.isMesh) {
                         child.userData = { type: 'crate_media', gameId: game.id, tagTitle: `《${game.title}》 (${game.year})`, tagSub: `${game.badgeText} // 點擊插入並自動開機`, accent: game.accentColor };
@@ -1848,7 +1876,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                     }
                 });
                 scene.add(mediaMesh);
-                crateItems.push({ game, mesh: mediaMesh, homePos: worldPos.clone(), homeRot: new THREE.Euler(-0.14, -0.32, 0), hoverProgress: 0 });
+                crateItems.push({ game, mesh: mediaMesh, homePos: worldPos.clone(), homeRot: new THREE.Euler(-0.3, -0.32, 0), hoverProgress: 0 });
             });
         }
 
@@ -2240,7 +2268,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             };
             ['touchend', 'pointerup', 'click'].forEach(t => window.addEventListener(t, unlockAudio, { passive: true }));
             const camDistNow = () => camTargetPos.distanceTo(camTargetLook);
-            const setCamDist = d => { const dir = camTargetPos.clone().sub(camTargetLook).normalize(); camTargetPos.copy(camTargetLook).add(dir.multiplyScalar(Math.max(3.2, Math.min(12.5, d)))); };
+            const setCamDist = d => { const dir = camTargetPos.clone().sub(camTargetLook).normalize(); camTargetPos.copy(camTargetLook).add(dir.multiplyScalar(Math.max(3.2, Math.min(portraitFitActive ? 30 : 12.5, d)))); };
             const pinchDist = () => { const p = [...activePointers.values()]; return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); };
             // 手機上小物件較難點中：中心沒打到時，在半徑內環狀取樣放寬判定
             function pickAt(cx, cy, tolerant) {
@@ -2254,6 +2282,23 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                     if (hit && hit.object.userData && (ox === 0 && oy === 0 || hit.object.userData.type !== 'desk_bg')) return hit;
                 }
                 return null;
+            }
+            // 收藏箱：以各片「露出的上緣中心」投影到螢幕，取最接近點擊處的那片
+            function crateAnchorScreen(item) {
+                const box = new THREE.Box3().setFromObject(item.mesh);
+                const c = box.getCenter(new THREE.Vector3());
+                const v = new THREE.Vector3(c.x, box.max.y - Math.min(0.18, (box.max.y - box.min.y) * 0.25), c.z).project(camera);
+                return { x: (v.x + 1) / 2 * viewW(), y: (1 - v.y) / 2 * viewH() };
+            }
+            window.__crateAnchorScreen = crateAnchorScreen;
+            function nearestCrateItem(cx, cy, maxPx) {
+                let best = null, bd = maxPx;
+                crateItems.forEach(it => {
+                    if (!it.mesh.visible) return;
+                    const a = crateAnchorScreen(it), d = Math.hypot(a.x - cx, a.y - cy);
+                    if (d < bd) { bd = d; best = it; }
+                });
+                return best;
             }
             container.addEventListener('pointerdown', e => {
                 if (e.pointerType === 'touch') {
@@ -2337,7 +2382,12 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
 
                 // Only trigger 3D click if pointer didn't drag
                 if (dragDist < (isTouch ? 12 : 7)) {
-                    const hit = pickAt(e.clientX, e.clientY, isTouch);
+                    let hit = pickAt(e.clientX, e.clientY, isTouch);
+                    const ht = hit && hit.object.userData ? hit.object.userData.type : null;
+                    if (ht === 'crate_media' || (isTouch && (!hit || ht === 'focus_crate' || ht === 'desk_bg'))) {
+                        const near = nearestCrateItem(e.clientX, e.clientY, ht === 'crate_media' ? 140 : (isTouch ? 45 : 0));
+                        if (near) { let m = null; near.mesh.traverse(c => { if (!m && c.isMesh) m = c; }); if (m) hit = { object: m }; }
+                    }
                     if (isTouch && hit && hit.object.userData && hit.object.userData.tagTitle) {
                         // 觸控：點擊時顯示原本 hover 才出現的 3D 標籤
                         const d = hit.object.userData, wp = new THREE.Vector3();
@@ -2505,7 +2555,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             }
 
             // 5. Smooth Damped Orbit Camera Update
-            const offset = camTargetPos.clone().sub(camTargetLook).multiplyScalar(camFitScale);
+            const offset = camTargetPos.clone().sub(camTargetLook).multiplyScalar(portraitFitActive && STATE.cameraFocus === 'overview' ? 1 : camFitScale);
             offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), orbitAzimuth);
             const finalCamPos = camTargetLook.clone().add(offset);
             finalCamPos.y += orbitElevation * 3.2;
