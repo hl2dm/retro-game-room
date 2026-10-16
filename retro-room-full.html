@@ -105,19 +105,19 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 id: 'sega', name: 'SEGA MEGA DRIVE 16-BIT', shortName: 'MEGA DRIVE', mediaType: 'md',
                 shelfSlotY: 3.21, badgeColor: '#3b82f6',
                 plate: ['SEGA MEGA DRIVE', 'CPU 68000 7.6MHz + Z80 // 1988 // 16-BIT ROM 卡帶'],
-                slot: new THREE.Vector3(0.15, 0.59, 0.10)
+                slot: new THREE.Vector3(0.08, 0.86, -0.08)
             },
             sfc: {
                 id: 'sfc', name: '超級任天堂 SUPER FAMICOM', shortName: 'SUPER FAMICOM', mediaType: 'sfc',
                 shelfSlotY: 2.26, badgeColor: '#a855f7',
                 plate: ['SUPER FAMICOM', 'CPU 65C816 3.58MHz // 1990 // 16-BIT ROM 卡帶'],
-                slot: new THREE.Vector3(0, 0.66, -0.20)
+                slot: new THREE.Vector3(0, 0.84, -0.36)
             },
             n64: {
                 id: 'n64', name: 'NINTENDO 64', shortName: 'NINTENDO 64', mediaType: 'n64',
                 shelfSlotY: 1.31, badgeColor: '#22c55e',
                 plate: ['NINTENDO 64', 'CPU VR4300 93.75MHz // 1996 // 64-BIT ROM 卡帶'],
-                slot: new THREE.Vector3(0, 0.72, -0.10)
+                slot: new THREE.Vector3(0, 0.88, -0.22)
             },
             ps2: {
                 id: 'ps2', name: 'PlayStation 2 128-BIT', shortName: 'PlayStation 2', mediaType: 'ps2',
@@ -1663,124 +1663,198 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
         }
 
         function buildAllThreeConsolesIn3D() {
-            const slotMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.9 });
-            const box = (w, h, d, mat, x, y, z, parent) => {
-                const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-                m.position.set(x, y, z);
-                m.castShadow = true; m.receiveShadow = true;
-                parent.add(m);
-                return m;
+            // 比例：0.008 單位 = 1mm（依實機尺寸 W×D×H：MD1 280×212×70、SFC 200×242×72、N64 260×190×73、PS2 301×182×78）
+            const MM = 0.008;
+            const slotMat = new THREE.MeshStandardMaterial({ color: 0x050506, roughness: 0.95 });
+            const add = (m, parent, x = 0, y = 0, z = 0) => { m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; };
+            const box = (w, h, d, mat, x, y, z, parent) => add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat), parent, x, y, z);
+            // 圓角方塊：footprint 圓角矩形擠出 + 斜角，底部在 y=0
+            const rbox = (w, h, d, r, bevel, mat, parent, x = 0, y = 0, z = 0) => {
+                const s = new THREE.Shape(), hw = w / 2 - bevel, hd = d / 2 - bevel, rr = Math.min(r, hw, hd);
+                s.moveTo(-hw + rr, -hd); s.lineTo(hw - rr, -hd); s.quadraticCurveTo(hw, -hd, hw, -hd + rr);
+                s.lineTo(hw, hd - rr); s.quadraticCurveTo(hw, hd, hw - rr, hd); s.lineTo(-hw + rr, hd);
+                s.quadraticCurveTo(-hw, hd, -hw, hd - rr); s.lineTo(-hw, -hd + rr); s.quadraticCurveTo(-hw, -hd, -hw + rr, -hd);
+                const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.001, h - bevel * 2), bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 8 });
+                g.rotateX(-Math.PI / 2); g.translate(0, bevel, 0);
+                return add(new THREE.Mesh(g, mat), parent, x, y, z);
             };
-            const led = (color, x, y, z, parent) => {
-                const m = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 12), new THREE.MeshBasicMaterial({ color }));
+            // 側面輪廓（YZ）沿 X 擠出
+            const profileX = (pts, width, bevel, mat, parent, x = 0, y = 0, z = 0) => {
+                const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]);
+                for (let i = 1; i < pts.length; i++) { const p = pts[i]; if (p.length === 4) s.quadraticCurveTo(p[0], p[1], p[2], p[3]); else s.lineTo(p[0], p[1]); }
+                const g = new THREE.ExtrudeGeometry(s, { depth: width - bevel * 2, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 16 });
+                g.rotateY(-Math.PI / 2); g.translate(width / 2 - bevel, 0, 0);
+                // Shape x=z方向, y=高度；rotateY(-90°) 後 shape.x → +z
+                return add(new THREE.Mesh(g, mat), parent, x, y, z);
+            };
+            const decal = (w, h, pxW, draw, parent, x, y, z, rx = -Math.PI / 2, ry = 0) => {
+                const c = document.createElement('canvas'); c.width = pxW; c.height = Math.round(pxW * h / w);
+                const ctx = c.getContext('2d'); draw(ctx, c.width, c.height);
+                const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+                const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }));
+                m.position.set(x, y, z); m.rotation.set(rx, ry, 0); parent.add(m); return m;
+            };
+            const led = (color, x, y, z, parent, r = 0.022) => {
+                const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 12), new THREE.MeshBasicMaterial({ color }));
                 m.position.set(x, y, z); parent.add(m); return m;
             };
+            const text = (ctx, str, x, y, font, color, align = 'center') => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillText(str, x, y); };
 
-            // ---------------- SEGA MEGA DRIVE ----------------
+            // ================= SEGA MEGA DRIVE（初代 日版）280×212×70 =================
             const md = new THREE.Group();
-            const mdBlack = new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.45, metalness: 0.2 });
-            const mdGloss = new THREE.MeshStandardMaterial({ color: 0x050506, roughness: 0.08, metalness: 0.6 });
-            const gold = new THREE.MeshStandardMaterial({ color: 0xd4a017, roughness: 0.25, metalness: 0.9, emissive: 0x3a2a00 });
-            box(2.2, 0.32, 1.55, mdBlack, 0, 0.16, 0, md);
-            const dome = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.66, 0.14, 48), mdGloss);
-            dome.position.set(0.15, 0.39, 0.1); md.add(dome);
-            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.63, 0.035, 12, 64), new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.1, metalness: 1.0 }));
-            ring.rotation.x = Math.PI / 2; ring.position.set(0.15, 0.4, 0.1); md.add(ring);
-            box(0.92, 0.04, 0.2, slotMat, 0.15, 0.47, 0.1, md);
-            const mdText = buildPixelText3D('16-BIT', 0.045, 0.04, gold);
-            mdText.rotation.x = -Math.PI / 2;
-            mdText.position.set(-1.0, 0.335, 0.72);
-            md.add(mdText);
-            // 左側白色音量滑桿
-            box(0.06, 0.02, 0.5, slotMat, -0.9, 0.33, -0.25, md);
-            const mdVol = box(0.12, 0.06, 0.1, new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.3 }), -0.9, 0.36, -0.25, md);
-            const mdPower = box(0.2, 0.07, 0.1, new THREE.MeshStandardMaterial({ color: 0x374151 }), -0.6, 0.355, 0.62, md);
-            const mdReset = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.07, 24), new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.3 }));
-            mdReset.position.set(0.85, 0.355, 0.6); md.add(mdReset);
-            const mdEject = box(0.24, 0.05, 0.12, new THREE.MeshStandardMaterial({ color: 0x1f2937 }), 0.15, 0.48, 0.42, md);
-            const mdLed = led(0xff2a2a, -0.92, 0.33, 0.66, md);
+            const W1 = 280 * MM, D1 = 212 * MM;          // 2.24 × 1.70
+            const mdBlack = new THREE.MeshStandardMaterial({ color: 0x0d0d10, roughness: 0.55, metalness: 0.08 });
+            const mdGloss = new THREE.MeshStandardMaterial({ color: 0x08080a, roughness: 0.18, metalness: 0.35 });
+            const mdGrey = new THREE.MeshStandardMaterial({ color: 0x2a2b30, roughness: 0.5 });
+            rbox(W1, 0.34, D1, 0.1, 0.03, mdBlack, md);
+            // 前方斜面條紋格柵（右前）
+            for (let i = 0; i < 7; i++) box(0.9, 0.012, 0.02, slotMat, 0.55, 0.07 + i * 0.03, D1 / 2 + 0.002, md);
+            // 中央圓頂（LatheGeometry）+ 同心圓棱紋
+            const domeCX = 0.08, domeCZ = -0.08;
+            const domePts = [[0.70, 0], [0.70, 0.02], [0.66, 0.06], [0.60, 0.13], [0.56, 0.17], [0.50, 0.19], [0.0, 0.20]].map(p => new THREE.Vector2(p[0], p[1]));
+            add(new THREE.Mesh(new THREE.LatheGeometry(domePts, 56), mdGloss), md, domeCX, 0.34, domeCZ);
+            [0.66, 0.62, 0.585, 0.55].forEach((r, i) => {
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.009, 6, 64), new THREE.MeshStandardMaterial({ color: i === 0 ? 0x8a8f99 : 0x1d1e22, roughness: 0.25, metalness: i === 0 ? 0.9 : 0.3 }));
+                ring.rotation.x = Math.PI / 2; ring.position.set(domeCX, 0.34 + [0.06, 0.11, 0.15, 0.175][i], domeCZ); md.add(ring);
+            });
+            // 金色 16-BIT 環形文字（圓頂外圈）
+            decal(1.66, 1.66, 512, (ctx, w, h) => {
+                ctx.translate(w / 2, h / 2);
+                ctx.font = 'bold 40px "Arial Black", Arial, sans-serif'; ctx.fillStyle = '#d9a821'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                const str = '16-BIT', R = 228, span = 0.62, start = Math.PI / 2 + span / 2;
+                for (let i = 0; i < str.length; i++) { const a = start - i * span / (str.length - 1); ctx.save(); ctx.rotate(a); ctx.translate(R, 0); ctx.rotate(-Math.PI / 2); ctx.fillText(str[i], 0, 0); ctx.restore(); }
+                ctx.strokeStyle = '#d9a821'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 252, Math.PI * 0.1, Math.PI * 0.9 - 0.0); ctx.stroke();
+            }, md, domeCX, 0.343, domeCZ);
+            // 卡帶槽（彈簧防塵蓋：左右兩片）
+            rbox(1.12, 0.03, 0.3, 0.05, 0.01, mdGrey, md, domeCX, 0.53, domeCZ);
+            box(1.04, 0.012, 0.115, mdBlack, domeCX, 0.562, domeCZ - 0.06, md);
+            box(1.04, 0.012, 0.115, mdBlack, domeCX, 0.562, domeCZ + 0.06, md);
+            box(1.04, 0.01, 0.006, slotMat, domeCX, 0.568, domeCZ, md);
+            const mdEject = box(0.22, 0.025, 0.06, mdGrey, domeCX, 0.55, domeCZ + 0.2, md); // 防塵蓋前緣（點擊退卡）
+            // 左上 POWER 滑動開關
+            box(0.34, 0.012, 0.08, slotMat, -0.78, 0.342, 0.58, md);
+            const mdPower = box(0.12, 0.05, 0.09, mdGrey, -0.86, 0.36, 0.58, md);
+            const mdReset = add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.065, 0.05, 28), mdGrey), md, -0.42, 0.36, 0.58);
+            const mdLed = led(0xff2a2a, -0.98, 0.345, 0.70, md);
+            decal(0.9, 0.12, 384, (ctx, w, h) => { text(ctx, 'POWER', w * 0.17, h / 2, 'bold 30px Arial', '#cfd2d8'); text(ctx, 'RESET', w * 0.68, h / 2, 'bold 30px Arial', '#cfd2d8'); }, md, -0.62, 0.343, 0.71);
+            // 正面左：音量滑桿 + 耳機孔
+            box(0.36, 0.035, 0.01, slotMat, -0.75, 0.2, D1 / 2 + 0.004, md);
+            const mdVol = box(0.06, 0.06, 0.035, new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.35 }), -0.9, 0.2, D1 / 2 + 0.02, md);
+            add(new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.02, 16), slotMat), md, -1.0, 0.2, D1 / 2 + 0.006).rotation.x = Math.PI / 2;
+            // 金色主機名銘板（右上）
+            decal(0.9, 0.14, 512, (ctx, w, h) => { text(ctx, 'MEGA DRIVE', w / 2, h / 2, 'italic 900 58px "Arial Black", Arial', '#e2e8f0'); }, md, 0.62, 0.343, 0.66);
+            decal(0.5, 0.06, 256, (ctx, w, h) => { text(ctx, 'HIGH GRADE MULTI PURPOSE USE', w / 2, h / 2, 'bold 14px Arial', '#d9a821'); }, md, 0.62, 0.343, 0.75);
             consoleParts.sega = { powerBtn: mdPower, ejectBtn: mdEject, resetBtn: mdReset, volumeKnob: mdVol, led: mdLed,
-                powerOnPos: new THREE.Vector3(-0.45, 0.355, 0.62), powerOffPos: new THREE.Vector3(-0.6, 0.355, 0.62), ledColor: 0xff2a2a };
+                volBaseX: -0.9, volStep: 0.07,
+                powerOnPos: new THREE.Vector3(-0.70, 0.36, 0.58), powerOffPos: new THREE.Vector3(-0.86, 0.36, 0.58), ledColor: 0xff2a2a };
 
-            // ---------------- SUPER FAMICOM ----------------
+            // ================= SUPER FAMICOM（日版）200×242×72 =================
             const sfc = new THREE.Group();
-            const sfcLight = new THREE.MeshStandardMaterial({ color: 0xd1d5db, roughness: 0.45 });
-            const sfcDark = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.5 });
-            box(2.32, 0.24, 1.86, sfcDark, 0, 0.12, 0, sfc);
-            box(2.22, 0.26, 1.74, sfcLight, 0, 0.36, 0, sfc);
-            box(1.3, 0.04, 0.34, sfcDark, 0, 0.5, -0.2, sfc);
-            box(1.22, 0.05, 0.22, slotMat, 0, 0.51, -0.2, sfc);
-            // 四色 logo 點（紫/藍/黃/綠）
-            [0x7c3aed, 0x3b82f6, 0xeab308, 0x22c55e].forEach((c, i) => {
-                const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16), new THREE.MeshStandardMaterial({ color: c, roughness: 0.3 }));
-                dot.position.set(0.62 + (i % 2) * 0.12, 0.5, 0.48 + Math.floor(i / 2) * 0.12); sfc.add(dot);
+            const W2 = 200 * MM, D2 = 242 * MM;          // 1.60 × 1.94
+            const sfcLight = new THREE.MeshStandardMaterial({ color: 0xaeb0b7, roughness: 0.72 });
+            const sfcMid = new THREE.MeshStandardMaterial({ color: 0x9da0a8, roughness: 0.72 });
+            const sfcDark = new THREE.MeshStandardMaterial({ color: 0x55585f, roughness: 0.6 });
+            const sfcPurple = new THREE.MeshStandardMaterial({ color: 0x6d5bd0, roughness: 0.45 });
+            rbox(W2, 0.30, D2, 0.16, 0.05, sfcMid, sfc);
+            rbox(W2 - 0.08, 0.26, D2 - 0.08, 0.18, 0.07, sfcLight, sfc, 0, 0.28, 0);
+            // 頂部深灰下沉區（卡帶槽 + 開關）
+            rbox(1.12, 0.04, 1.12, 0.1, 0.015, sfcDark, sfc, 0, 0.515, -0.12);
+            rbox(1.24, 0.03, 0.28, 0.06, 0.01, sfcDark, sfc, 0, 0.53, -0.36);
+            box(1.18, 0.012, 0.2, slotMat, 0, 0.556, -0.36, sfc);
+            // 紫色 POWER / RESET 滑動開關與大 EJECT 鍵
+            box(0.12, 0.01, 0.22, slotMat, -0.4, 0.558, 0.18, sfc);
+            box(0.12, 0.01, 0.22, slotMat, 0.4, 0.558, 0.18, sfc);
+            const sfcPower = rbox(0.11, 0.06, 0.12, 0.03, 0.01, sfcPurple, sfc, -0.4, 0.555, 0.24);
+            const sfcReset = rbox(0.11, 0.06, 0.12, 0.03, 0.01, sfcPurple, sfc, 0.4, 0.555, 0.12);
+            const sfcEject = rbox(0.34, 0.07, 0.2, 0.05, 0.015, sfcMid, sfc, 0, 0.55, 0.06);
+            decal(1.0, 0.08, 512, (ctx, w, h) => { text(ctx, 'POWER', w * 0.1, h / 2, 'bold 26px Arial', '#e5e7eb'); text(ctx, 'EJECT', w * 0.5, h / 2, 'bold 26px Arial', '#e5e7eb'); text(ctx, 'RESET', w * 0.9, h / 2, 'bold 26px Arial', '#e5e7eb'); }, sfc, 0, 0.537, 0.36);
+            // 四色圓形標誌（左前角）
+            [[0xd62828, 0, -1], [0xf2c12e, 1, 0], [0x2a9d4b, 0, 1], [0x2563eb, -1, 0]].forEach(([c, dx, dz]) => {
+                add(new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.012, 20), new THREE.MeshStandardMaterial({ color: c, roughness: 0.35 })), sfc, -0.5 + dx * 0.045, 0.545, 0.74 + dz * 0.045);
             });
-            box(1.9, 0.01, 0.04, new THREE.MeshStandardMaterial({ color: 0x7c3aed }), 0, 0.3, 0.875, sfc);
-            box(0.36, 0.02, 0.12, slotMat, -0.62, 0.495, 0.5, sfc);
-            const sfcPower = box(0.14, 0.08, 0.1, new THREE.MeshStandardMaterial({ color: 0x4b5563 }), -0.7, 0.53, 0.5, sfc);
-            const sfcEject = box(0.5, 0.1, 0.3, new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.35 }), 0, 0.53, 0.45, sfc);
-            const sfcLed = led(0xff2a2a, -0.95, 0.5, 0.75, sfc);
-            consoleParts.sfc = { powerBtn: sfcPower, ejectBtn: sfcEject, led: sfcLed,
-                powerOnPos: new THREE.Vector3(-0.54, 0.53, 0.5), powerOffPos: new THREE.Vector3(-0.7, 0.53, 0.5), ledColor: 0xff2a2a };
+            decal(0.8, 0.12, 512, (ctx, w, h) => { text(ctx, 'SUPER Famicom', w / 2, h / 2, 'italic bold 52px Arial', '#4b4f57'); }, sfc, 0.25, 0.541, 0.74);
+            // 正面：兩個手把孔 + 電源燈
+            [-0.22, 0.22].forEach(x => { rbox(0.26, 0.11, 0.03, 0.03, 0.008, sfcDark, sfc, x, 0.09, D2 / 2 - 0.005); box(0.18, 0.05, 0.02, slotMat, x, 0.145, D2 / 2 + 0.012, sfc); });
+            const sfcLed = led(0xff2a2a, -0.62, 0.17, D2 / 2 + 0.005, sfc);
+            consoleParts.sfc = { powerBtn: sfcPower, ejectBtn: sfcEject, resetBtn: sfcReset, led: sfcLed,
+                powerOnPos: new THREE.Vector3(-0.4, 0.555, 0.12), powerOffPos: new THREE.Vector3(-0.4, 0.555, 0.24), ledColor: 0xff2a2a };
 
-            // ---------------- NINTENDO 64 ----------------
+            // ================= NINTENDO 64  260×190×73 =================
             const n64 = new THREE.Group();
-            const charcoal = new THREE.MeshStandardMaterial({ color: 0x2b2d31, roughness: 0.5, metalness: 0.15 });
-            box(2.1, 0.2, 1.7, charcoal, 0, 0.1, 0, n64);
-            const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 2.1, 40), charcoal);
-            shell.rotation.z = Math.PI / 2; shell.scale.set(0.32, 1, 1); shell.position.y = 0.3; shell.castShadow = true;
-            n64.add(shell);
-            // 彎曲頂部卡帶槽（弧形邊框）
-            const slotRim = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.03, 8, 32, Math.PI), new THREE.MeshStandardMaterial({ color: 0x111111 }));
-            slotRim.position.set(0, 0.56, -0.1); slotRim.rotation.x = -Math.PI / 2; slotRim.scale.set(1, 0.3, 1); n64.add(slotRim);
-            box(1.0, 0.04, 0.2, slotMat, 0, 0.565, -0.1, n64);
+            const W3 = 260 * MM, D3 = 190 * MM;          // 2.08 × 1.52
+            const charcoal = new THREE.MeshStandardMaterial({ color: 0x2a2c31, roughness: 0.55, metalness: 0.06 });
+            const charcoal2 = new THREE.MeshStandardMaterial({ color: 0x33363c, roughness: 0.5, metalness: 0.06 });
+            const hz = D3 / 2;
+            // 兩側翼：較低、前緣弧形下彎
+            profileX([[-hz, 0], [hz, 0], [hz, 0.12], [hz - 0.05, 0.34, hz - 0.35, 0.42], [-hz + 0.1, 0.44], [-hz, 0.40]], W3, 0.04, charcoal, n64);
+            // 中央隆起（卡帶槽所在）
+            profileX([[-hz + 0.02, 0.3], [hz - 0.12, 0.3], [hz - 0.12, 0.36], [hz - 0.2, 0.55, hz - 0.55, 0.58], [-hz + 0.12, 0.58], [-hz + 0.02, 0.52]], 1.2, 0.05, charcoal2, n64);
+            // 卡帶槽 + 翻蓋（前後兩片）
+            rbox(1.06, 0.03, 0.3, 0.04, 0.01, charcoal, n64, 0, 0.6, -0.22);
+            box(0.98, 0.012, 0.1, slotMat, 0, 0.632, -0.22, n64);
+            const n64Flap = box(0.98, 0.012, 0.06, new THREE.MeshStandardMaterial({ color: 0x1a1b1f, roughness: 0.6 }), 0, 0.636, -0.13, n64);
+            // 擴充記憶體蓋（隆起前端）
+            rbox(0.62, 0.02, 0.26, 0.04, 0.006, new THREE.MeshStandardMaterial({ color: 0x2f3237, roughness: 0.5 }), n64, 0, 0.6, 0.12);
+            box(0.62, 0.004, 0.004, slotMat, 0, 0.622, 0.0, n64);
+            // 左 POWER / 右 RESET 滑動開關（側翼頂部）
+            box(0.14, 0.01, 0.22, slotMat, -0.78, 0.46, -0.1, n64);
+            box(0.14, 0.01, 0.22, slotMat, 0.78, 0.46, -0.1, n64);
+            const n64Power = rbox(0.12, 0.05, 0.1, 0.02, 0.008, new THREE.MeshStandardMaterial({ color: 0x5b5f67, roughness: 0.45 }), n64, -0.78, 0.455, -0.04);
+            const n64Reset = rbox(0.12, 0.05, 0.1, 0.02, 0.008, new THREE.MeshStandardMaterial({ color: 0x5b5f67, roughness: 0.45 }), n64, 0.78, 0.455, -0.16);
+            decal(1.8, 0.07, 768, (ctx, w, h) => { text(ctx, 'POWER', w * 0.065, h / 2, 'bold 22px Arial', '#9ca3af'); text(ctx, 'RESET', w * 0.935, h / 2, 'bold 22px Arial', '#9ca3af'); }, n64, 0, 0.452, 0.08);
             // 前方四個手把孔
-            [-0.66, -0.22, 0.22, 0.66].forEach(x => {
-                box(0.3, 0.12, 0.04, new THREE.MeshStandardMaterial({ color: 0x111827 }), x, 0.12, 0.86, n64);
-                box(0.2, 0.05, 0.02, new THREE.MeshStandardMaterial({ color: 0x000000 }), x, 0.12, 0.885, n64);
-            });
-            // 3D 四色「N」logo
-            const nLogo = new THREE.Group();
-            const nm = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.3, metalness: 0.2 });
-            box(0.07, 0.28, 0.07, nm(0xef4444), -0.1, 0, 0, nLogo);
-            box(0.07, 0.28, 0.07, nm(0x22c55e), 0.1, 0, 0, nLogo);
-            const diag = box(0.07, 0.32, 0.07, nm(0x3b82f6), 0, 0, 0, nLogo); diag.rotation.z = 0.6;
-            box(0.3, 0.04, 0.09, nm(0xeab308), 0, -0.16, -0.01, nLogo);
-            nLogo.position.set(0, 0.6, 0.45); nLogo.rotation.x = -0.35; n64.add(nLogo);
-            const n64Power = box(0.14, 0.07, 0.1, new THREE.MeshStandardMaterial({ color: 0x6b7280 }), -0.55, 0.57, 0.2, n64);
-            const n64Eject = box(0.14, 0.07, 0.1, new THREE.MeshStandardMaterial({ color: 0x6b7280 }), 0.55, 0.57, 0.2, n64);
-            const n64Led = led(0xff2a2a, -0.95, 0.15, 0.87, n64);
-            consoleParts.n64 = { powerBtn: n64Power, ejectBtn: n64Eject, led: n64Led,
-                powerOnPos: new THREE.Vector3(-0.55, 0.57, 0.05), powerOffPos: new THREE.Vector3(-0.55, 0.57, 0.2), ledColor: 0xff2a2a };
+            [-0.66, -0.22, 0.22, 0.66].forEach(x => { rbox(0.26, 0.1, 0.03, 0.03, 0.008, new THREE.MeshStandardMaterial({ color: 0x1b1c20 }), n64, x, 0.03, hz - 0.01); box(0.17, 0.035, 0.02, slotMat, x, 0.08, hz + 0.012, n64); });
+            // 立體 N 方塊標誌（原創風格四色方塊 + 文字銘板）
+            const cube = new THREE.Group();
+            const cm = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.35 });
+            [[0xd62828, -1, -1], [0x2a9d4b, 1, -1], [0x2563eb, -1, 1], [0xf2c12e, 1, 1]].forEach(([c, a, b]) => box(0.06, 0.06, 0.06, cm(c), a * 0.032, 0, b * 0.032, cube));
+            cube.position.set(0, 0.62, 0.36); cube.rotation.y = Math.PI / 4; n64.add(cube);
+            decal(0.7, 0.1, 512, (ctx, w, h) => { text(ctx, 'NINTENDO⁶⁴', w / 2, h / 2, 'italic 900 50px "Arial Black", Arial', '#c9ccd2'); }, n64, 0, 0.432, 0.56, -Math.PI / 2 + 0.55);
+            const n64Led = led(0xff2a2a, -0.88, 0.09, hz + 0.005, n64);
+            consoleParts.n64 = { powerBtn: n64Power, ejectBtn: n64Flap, resetBtn: n64Reset, led: n64Led,
+                powerOnPos: new THREE.Vector3(-0.78, 0.455, -0.16), powerOffPos: new THREE.Vector3(-0.78, 0.455, -0.04), ledColor: 0xff2a2a };
 
-            // ---------------- PLAYSTATION 2 ----------------
+            // ================= PlayStation 2（初期型 SCPH-30000）301×182×78 =================
             const ps2 = new THREE.Group();
-            const ps2Black = new THREE.MeshStandardMaterial({ color: 0x0c0c10, roughness: 0.35, metalness: 0.3 });
-            const ps2Rib = new THREE.MeshStandardMaterial({ color: 0x1c1c24, roughness: 0.25, metalness: 0.5 });
-            box(2.4, 0.22, 1.6, ps2Black, 0, 0.11, 0, ps2);       // 底層
-            box(2.4, 0.16, 1.6, ps2Black, 0, 0.42, 0, ps2);       // 上層（中間留托盤空間）
-            box(2.4, 0.12, 0.9, ps2Black, 0, 0.28, -0.35, ps2);   // 托盤艙後半
-            box(0.5, 0.12, 1.6, ps2Black, -0.95, 0.28, 0, ps2);   // 左右側壁
-            box(0.5, 0.12, 1.6, ps2Black, 0.95, 0.28, 0, ps2);
-            for (let i = 0; i < 12; i++) box(2.3, 0.025, 0.05, ps2Rib, 0, 0.51, -0.7 + i * 0.125, ps2); // 頂部百葉散熱鰭
-            for (let i = 0; i < 6; i++) box(0.5, 0.02, 0.03, ps2Rib, -0.95, 0.06 + i * 0.03, 0.81, ps2);
-            // 電動光碟托盤
+            const W4 = 301 * MM, D4 = 182 * MM;          // 2.41 × 1.46
+            const ps2Black = new THREE.MeshStandardMaterial({ color: 0x111216, roughness: 0.7, metalness: 0.05 });
+            const ps2Gloss = new THREE.MeshStandardMaterial({ color: 0x0a0b0e, roughness: 0.3, metalness: 0.2 });
+            const ps2Groove = new THREE.MeshStandardMaterial({ color: 0x030304, roughness: 0.9 });
+            const fz = D4 / 2;
+            rbox(W4, 0.29, D4, 0.03, 0.012, ps2Black, ps2);                         // 下層
+            box(W4 - 0.05, 0.05, D4 - 0.05, ps2Groove, 0, 0.31, 0, ps2);            // 中間分層凹槽
+            rbox(W4, 0.29, D4, 0.03, 0.012, ps2Black, ps2, 0, 0.33, 0);             // 上層
+            // 頂部細溝紋
+            for (let i = 0; i < 26; i++) box(W4 - 0.12, 0.003, 0.012, ps2Groove, 0, 0.621, -fz + 0.1 + i * 0.05, ps2);
+            // 兩側百葉散熱孔
+            [-1, 1].forEach(s => { for (let i = 0; i < 9; i++) { const v = box(0.012, 0.018, 1.1, ps2Groove, s * (W4 / 2 + 0.002), 0.06 + i * 0.026, 0, ps2); v.rotation.x = 0; } for (let i = 0; i < 9; i++) box(0.012, 0.018, 1.1, ps2Groove, s * (W4 / 2 + 0.002), 0.39 + i * 0.024, 0, ps2); });
+            // 正面右側直條控制區（上層）
+            box(0.36, 0.27, 0.01, ps2Gloss, 1.0, 0.475, fz + 0.004, ps2);
+            for (let i = 0; i < 5; i++) box(1.95, 0.004, 0.006, ps2Groove, -0.2, 0.36 + i * 0.012, fz + 0.004, ps2);
+            // 電動光碟托盤（上層左側開口，前蓋印 PlayStation 2 字樣）
+            box(1.66, 0.07, 0.02, ps2Groove, -0.3, 0.45, fz - 0.005, ps2);
             const tray = new THREE.Group();
-            box(1.36, 0.03, 1.4, new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.6 }), 0, 0, 0, tray);
-            const well = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.012, 40), new THREE.MeshStandardMaterial({ color: 0x27272a }));
-            well.position.y = 0.018; tray.add(well);
-            box(1.38, 0.12, 0.04, ps2Black, 0, 0.0, 0.7, tray);   // 托盤前蓋
-            tray.position.set(0, 0.3, 0.1);
+            box(1.6, 0.025, 1.3, new THREE.MeshStandardMaterial({ color: 0x1a1b20, roughness: 0.6 }), 0, 0, 0, tray);
+            const well = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.01, 48), new THREE.MeshStandardMaterial({ color: 0x24252b, roughness: 0.5 }));
+            well.position.y = 0.016; tray.add(well);
+            box(1.64, 0.066, 0.03, ps2Black, 0, 0.0, 0.66, tray);
+            decal(0.7, 0.05, 512, (ctx, w, h) => { text(ctx, 'PlayStation 2', w / 2, h / 2, '500 34px "Segoe UI", Arial', '#cbd5e1'); }, tray, -0.35, 0.0, 0.677, 0);
+            tray.position.set(-0.3, 0.45, 0.08);
             ps2.add(tray);
-            const ps2Power = box(0.12, 0.06, 0.03, new THREE.MeshStandardMaterial({ color: 0x334155 }), 0.95, 0.42, 0.815, ps2);
-            const ps2Eject = box(0.12, 0.06, 0.03, new THREE.MeshStandardMaterial({ color: 0x334155 }), 0.95, 0.3, 0.815, ps2);
-            const ps2LedB = led(0x3b82f6, 0.82, 0.42, 0.83, ps2);
-            const ps2LedG = led(0x22c55e, 0.82, 0.3, 0.83, ps2);
-            const ps2Logo = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.12), new THREE.MeshBasicMaterial({ map: createPrintedSignTexture('PlayStation 2', 'DVD', '#3b82f6'), transparent: true }));
-            ps2Logo.position.set(-0.55, 0.42, 0.805); ps2.add(ps2Logo);
-            consoleParts.ps2 = { powerBtn: ps2Power, ejectBtn: ps2Eject, led: ps2LedB, led2: ps2LedG, tray,
-                trayClosedZ: 0.1, trayOpenZ: 1.25,
-                powerOnPos: new THREE.Vector3(0.95, 0.42, 0.8), powerOffPos: new THREE.Vector3(0.95, 0.42, 0.815), ledColor: 0x3b82f6 };
+            // 右側：RESET（綠/紅 LED）與 EJECT（藍 LED）
+            const ps2Power = rbox(0.13, 0.06, 0.03, 0.01, 0.006, new THREE.MeshStandardMaterial({ color: 0x23252b, roughness: 0.4 }), ps2, 1.06, 0.53, fz + 0.002);
+            const ps2Eject = rbox(0.13, 0.05, 0.03, 0.01, 0.006, new THREE.MeshStandardMaterial({ color: 0x23252b, roughness: 0.4 }), ps2, 1.06, 0.4, fz + 0.002);
+            const ps2LedB = led(0x22c55e, 0.93, 0.56, fz + 0.012, ps2, 0.016);
+            const ps2LedG = led(0x3b82f6, 0.93, 0.425, fz + 0.012, ps2, 0.016);
+            decal(0.2, 0.2, 128, (ctx, w, h) => { ctx.fillStyle = '#2f6fe0'; ctx.font = 'italic 900 70px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PS', w / 2, h / 2); }, ps2, 1.0, 0.36 + 0.006, fz + 0.012, 0);
+            // 下層正面：2 手把孔 + 2 記憶卡槽 + USB / i.LINK
+            [-0.85, -0.4].forEach(x => { box(0.24, 0.07, 0.01, ps2Groove, x, 0.2, fz + 0.004, ps2); box(0.24, 0.025, 0.01, ps2Groove, x, 0.08, fz + 0.004, ps2); });
+            [0.5, 0.62].forEach(x => box(0.07, 0.03, 0.01, ps2Groove, x, 0.14, fz + 0.004, ps2));
+            box(0.06, 0.03, 0.01, ps2Groove, 0.8, 0.14, fz + 0.004, ps2);
+            decal(0.6, 0.04, 512, (ctx, w, h) => { text(ctx, 'CONTROLLER   MEMORY CARD', w / 2, h / 2, '20px Arial', '#64748b'); }, ps2, -0.62, 0.27, fz + 0.006, 0);
+            consoleParts.ps2 = { powerBtn: ps2Power, ejectBtn: ps2Eject, resetBtn: undefined, led: ps2LedB, led2: ps2LedG, tray,
+                trayClosedZ: 0.08, trayOpenZ: 1.25,
+                powerOnPos: new THREE.Vector3(1.06, 0.53, fz - 0.008), powerOffPos: new THREE.Vector3(1.06, 0.53, fz + 0.002), ledColor: 0x22c55e };
 
             [['sega', md], ['sfc', sfc], ['n64', n64], ['ps2', ps2]].forEach(([cid, grp]) => {
                 registerConsoleInteractions(grp, cid);
@@ -2125,7 +2199,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             // PS2：托盤滑出 -> 光碟落在托盤 -> 托盤載著光碟滑回
             const parts = consoleParts.ps2;
             const tray = parts.tray;
-            const trayOpenWorld = () => ACTIVE_DECK_POS.clone().add(new THREE.Vector3(0, tray.position.y + 0.035, parts.trayOpenZ));
+            const trayOpenWorld = () => ACTIVE_DECK_POS.clone().add(new THREE.Vector3(tray.position.x, tray.position.y + 0.035, parts.trayOpenZ));
             const above = trayOpenWorld().add(new THREE.Vector3(0, 0.9, 0));
             const duration = 1900;
             SFX.playCDMotorWhir();
@@ -2466,7 +2540,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                     if (data.consoleId !== STATE.activeConsoleId) { swapConsoleFromShelf(data.consoleId); break; }
                     STATE.volumeLevel = (STATE.volumeLevel + 1) % 5;
                     const knob = consoleParts.sega.volumeKnob;
-                    knob.position.z = -0.45 + STATE.volumeLevel * 0.1;
+                    knob.position.x = consoleParts.sega.volBaseX + STATE.volumeLevel * consoleParts.sega.volStep;
                     SFX.playSwitchClick(500 + STATE.volumeLevel * 120);
                     showTVStatusOSD(`VOLUME ${'█'.repeat(STATE.volumeLevel)}${'░'.repeat(4 - STATE.volumeLevel)}`);
                     break;
