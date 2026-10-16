@@ -1159,12 +1159,13 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                     const cfg = CUSTOM_ASSET_CONFIG.mediaAssets[gameId];
                     if (!cfg) return;
                     loadImg(cfg.labelImageUrl, img => {
+                        markShadowDirty(2);
                         LOADED_CUSTOM_IMAGES.labels[gameId] = img;
                         refreshGameLabelTexture(gameId);
                     });
-                    loadImg(cfg.screenImageUrl, img => {
-                        LOADED_CUSTOM_IMAGES.screens[gameId] = img;
-                    });
+                    // 遊戲畫面改為插入時才載入（lazy），縮短首次載入
+                    window.__screenLoaders = window.__screenLoaders || {};
+                    window.__screenLoaders[gameId] = () => { if (LOADED_CUSTOM_IMAGES.screens[gameId] || window.__screenLoaders[gameId].busy) return; window.__screenLoaders[gameId].busy = true; loadImg(cfg.screenImageUrl, img => { LOADED_CUSTOM_IMAGES.screens[gameId] = img; }); };
                 });
             }
         }
@@ -1328,6 +1329,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             applyResponsiveCamera();
             container.appendChild(renderer.domElement);
 
+            renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
             setupRoomLighting();
             buildCozyRetroRoom();
             buildLeftConsoleDisplayRack();
@@ -1337,6 +1339,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             buildDiegetic3DFloatingSprite();
 
             applyResponsiveCamera(); camera.position.copy(camTargetPos);
+            buildFirstHint();
             preloadConfiguredCustomAssets(); // 載入 CUSTOM_ASSET_CONFIG 內設定的圖片
             setup3DRaycasterAndOrbit(container);
             window.addEventListener('resize', onResize);
@@ -1814,8 +1817,8 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             // ================= SUPER FAMICOM（日版）200×242×72 =================
             const sfc = new THREE.Group();
             const W2 = 200 * MM, D2 = 242 * MM;          // 1.60 × 1.94
-            const sfcLight = new THREE.MeshStandardMaterial({ color: 0xaeb0b7, roughness: 0.72 });
-            const sfcMid = new THREE.MeshStandardMaterial({ color: 0x9da0a8, roughness: 0.72 });
+            const sfcLight = new THREE.MeshStandardMaterial({ color: 0x8a8c93, roughness: 0.88 });
+            const sfcMid = new THREE.MeshStandardMaterial({ color: 0x7c7f87, roughness: 0.88 });
             const sfcDark = new THREE.MeshStandardMaterial({ color: 0x55585f, roughness: 0.6 });
             const sfcPurple = new THREE.MeshStandardMaterial({ color: 0x6d5bd0, roughness: 0.45 });
             rbox(W2, 0.30, D2, 0.16, 0.05, sfcMid, sfc);
@@ -1974,6 +1977,38 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 trayClosedZ: xf - 0.68, trayOpenZ: xf + 0.6,
                 powerOnPos: new THREE.Vector3(0.9, 0.36, xf + 0.0), powerOffPos: new THREE.Vector3(0.9, 0.36, xf + 0.01), ledColor: 0x22ff55 };
 
+            // 效能：同材質的靜態零件合併成單一 mesh，大幅減少 draw calls
+            const mergeStatic = (root, cid) => {
+                const parts = consoleParts[cid], keep = new Set();
+                Object.values(parts).forEach(v => { if (v && v.isObject3D) v.traverse(o => keep.add(o)); });
+                root.updateMatrixWorld(true);
+                const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+                const buckets = new Map();
+                root.traverse(o => {
+                    if (!o.isMesh || keep.has(o) || o.material.transparent || Array.isArray(o.material)) return;
+                    if (!buckets.has(o.material)) buckets.set(o.material, []);
+                    buckets.get(o.material).push(o);
+                });
+                buckets.forEach((list, mat) => {
+                    if (list.length < 2) return;
+                    const pos = [], nor = [], uv = [];
+                    list.forEach(m => {
+                        let g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+                        g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld));
+                        pos.push(g.attributes.position.array); nor.push(g.attributes.normal ? g.attributes.normal.array : new Float32Array(g.attributes.position.count * 3));
+                        uv.push(g.attributes.uv ? g.attributes.uv.array : new Float32Array(g.attributes.position.count * 2));
+                        m.parent.remove(m); m.geometry.dispose(); g.dispose();
+                    });
+                    const cat = arrs => { const n = arrs.reduce((a, b) => a + b.length, 0), out = new Float32Array(n); let o = 0; arrs.forEach(a => { out.set(a, o); o += a.length; }); return out; };
+                    const mg = new THREE.BufferGeometry();
+                    mg.setAttribute('position', new THREE.BufferAttribute(cat(pos), 3));
+                    mg.setAttribute('normal', new THREE.BufferAttribute(cat(nor), 3));
+                    mg.setAttribute('uv', new THREE.BufferAttribute(cat(uv), 2));
+                    mg.computeBoundingSphere();
+                    const mm = new THREE.Mesh(mg, mat); mm.castShadow = true; mm.receiveShadow = true; root.add(mm);
+                });
+            };
+            [['sega', md], ['sfc', sfc], ['n64', n64], ['ps2', ps2], ['x360', x360]].forEach(([cid, grp]) => mergeStatic(grp, cid));
             [['sega', md], ['sfc', sfc], ['n64', n64], ['ps2', ps2], ['x360', x360]].forEach(([cid, grp]) => {
                 registerConsoleInteractions(grp, cid);
                 scene.add(grp);
@@ -2292,6 +2327,8 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             insertedMediaMesh.position.copy(startPos);
             insertedMediaMesh.rotation.copy(crateEntry.homeRot);
             insertedMediaMesh.userData.baseScale = 1;
+            if (window.__screenLoaders && window.__screenLoaders[game.id]) window.__screenLoaders[game.id]();
+            markShadowDirty(120); dismissFirstHint();
             const startTime = performance.now();
 
             if (!isDiscType(game.mediaType)) {
@@ -2578,6 +2615,14 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 }
             });
 
+            let lastTapT = 0, lastTapX = 0, lastTapY = 0;
+            const isEmptyAt = (x, y) => { const h = pickAt(x, y, false); return !h || !h.object.userData || h.object.userData.type === 'desk_bg' || !h.object.userData.type; };
+            container.addEventListener('dblclick', e => { if (isEmptyAt(e.clientX, e.clientY)) { SFX.playSwitchClick(540); setDiegeticCameraFocus('overview'); } });
+            window.__dtap = (e) => {
+                const now = e.timeStamp || performance.now();
+                if (now - lastTapT < 450 && Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) < 40 && isEmptyAt(e.clientX, e.clientY)) { setDiegeticCameraFocus('overview'); lastTapT = 0; return true; }
+                lastTapT = now; lastTapX = e.clientX; lastTapY = e.clientY; return false;
+            };
             const endTouch = e => { if (e.pointerType === 'touch') activePointers.delete(e.pointerId); };
             window.addEventListener('pointercancel', e => { endTouch(e); isPointerDragging = false; });
             window.addEventListener('pointerup', e => {
@@ -2589,6 +2634,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
 
                 // Only trigger 3D click if pointer didn't drag
                 if (dragDist < (isTouch ? 12 : 7)) {
+                    if (isTouch && window.__dtap(e)) return;
                     let hit = pickAt(e.clientX, e.clientY, isTouch);
                     const ht = hit && hit.object.userData ? hit.object.userData.type : null;
                     if (ht === 'crate_media' || (isTouch && (!hit || ht === 'focus_crate' || ht === 'desk_bg'))) {
@@ -2724,12 +2770,47 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
         /*************************************************************************
          * 10. MAIN ANIMATION LOOP
          *************************************************************************/
+        let shadowDirty = 8, lastCrtT = 0, lastInputT = performance.now(), hoverMat = null, hoverMatOrig = null;
+        function markShadowDirty(n = 30) { shadowDirty = Math.max(shadowDirty, n); lastInputT = performance.now(); }
+        ['pointerdown', 'pointermove', 'wheel', 'keydown'].forEach(t => window.addEventListener(t, () => { lastInputT = performance.now(); }, { passive: true }));
+        window.addEventListener('pointerdown', () => markShadowDirty(40), { passive: true });
+        // 首次提示（收藏箱上方 3D 浮動標示），第一次插入後消失並記住
+        let firstHintSprite = null;
+        function buildFirstHint() {
+            try { if (localStorage.getItem('retroRoomHintSeen')) return; } catch (e) {}
+            const c = document.createElement('canvas'); c.width = 512; c.height = 160; const x = c.getContext('2d');
+            x.fillStyle = 'rgba(8,10,24,0.82)'; x.strokeStyle = '#fbbf24'; x.lineWidth = 6;
+            x.beginPath(); x.roundRect ? x.roundRect(6, 6, 500, 120, 22) : x.rect(6, 6, 500, 120); x.fill(); x.stroke();
+            x.beginPath(); x.moveTo(236, 126); x.lineTo(256, 154); x.lineTo(276, 126); x.fillStyle = '#fbbf24'; x.fill();
+            x.fillStyle = '#fff'; x.font = 'bold 40px "Noto Sans TC", sans-serif'; x.textAlign = 'center'; x.fillText(IS_TOUCH ? '點一下卡帶／光碟' : '點擊卡帶／光碟', 256, 62);
+            x.fillStyle = '#fde68a'; x.font = 'bold 26px "Noto Sans TC", sans-serif'; x.fillText('自動換主機並開機・雙擊空白處回總覽', 256, 104);
+            firstHintSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
+            firstHintSprite.scale.set(2.6, 0.81, 1); firstHintSprite.renderOrder = 999;
+            firstHintSprite.position.copy(CRATE_POS).add(new THREE.Vector3(-0.3, 2.6, 0.3));
+            scene.add(firstHintSprite);
+        }
+        function dismissFirstHint() { if (!firstHintSprite) return; scene.remove(firstHintSprite); firstHintSprite = null; try { localStorage.setItem('retroRoomHintSeen', '1'); } catch (e) {} }
+        // 懸停/點擊高亮：暫時提高材質自發光
+        function setHoverHighlight(mesh) {
+            const mat = mesh && mesh.material && mesh.material.emissive ? mesh.material : null;
+            if (mat === hoverMat) return;
+            if (hoverMat) hoverMat.emissive.copy(hoverMatOrig);
+            hoverMat = mat; hoverMatOrig = mat ? mat.emissive.clone() : null;
+            if (mat && !(mesh.userData && mesh.userData.type === 'desk_bg')) mat.emissive.setRGB(hoverMatOrig.r + 0.12, hoverMatOrig.g + 0.1, hoverMatOrig.b + 0.04);
+        }
         function animate() {
             requestAnimationFrame(animate);
-            const time = performance.now() * 0.001;
+            if (document.hidden) return;
+            const nowMs = performance.now();
+            const time = nowMs * 0.001;
+            // 閒置 15 秒以上（行動裝置 8 秒）降到 ~30fps 省電
+            const idle = nowMs - lastInputT > (MOBILE_LITE ? 8000 : 15000) && !STATE.isBusy;
+            if (idle && (animate._skip = !animate._skip)) return;
 
-            // 1. Update CRT TV Screen Canvas Texture
-            updateCRTScreen(time);
+            // 1. Update CRT TV Screen Canvas Texture（最多 ~30fps）
+            if (nowMs - lastCrtT > 32) { lastCrtT = nowMs; updateCRTScreen(time); }
+            setHoverHighlight(hoveredInteractive);
+            if (firstHintSprite) firstHintSprite.material.opacity = 0.75 + 0.25 * Math.sin(time * 3);
 
             // 2. Smooth Levitation for Hovered Cartridge/Disc in the Right Crate
             const hoveredGameId = (hoveredInteractive && hoveredInteractive.userData && hoveredInteractive.userData.type === 'crate_media')
@@ -2740,7 +2821,9 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 if (!item.mesh.visible) return;
                 const isHovered = (item.game.id === hoveredGameId);
                 const targetLift = isHovered ? 0.38 : 0.0;
-                item.hoverProgress += (targetLift - item.hoverProgress) * 0.16;
+                const dh = (targetLift - item.hoverProgress) * 0.16;
+                item.hoverProgress += dh;
+                if (Math.abs(dh) > 0.0005) shadowDirty = Math.max(shadowDirty, 2);
 
                 item.mesh.position.y = item.homePos.y + item.hoverProgress;
                 item.mesh.rotation.x = item.homeRot.x + (isHovered ? 0.14 : 0);
@@ -2751,7 +2834,9 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 const ps2p = consoleParts[dc];
                 if (ps2p && ps2p.tray && !STATE.isBusy) {
                     const tz = (STATE.activeConsoleId === dc && STATE.ps2TrayOpen) ? ps2p.trayOpenZ : ps2p.trayClosedZ;
-                    ps2p.tray.position.z += (tz - ps2p.tray.position.z) * 0.12;
+                    const dz = (tz - ps2p.tray.position.z) * 0.12;
+                    ps2p.tray.position.z += dz;
+                    if (Math.abs(dz) > 0.0005) shadowDirty = Math.max(shadowDirty, 2);
                 }
             });
             Object.values(consoleParts).forEach(p => {
@@ -2773,6 +2858,8 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
             camCurrentLook.lerp(camTargetLook, 0.085);
             camera.lookAt(camCurrentLook);
 
+            if (STATE.isBusy) shadowDirty = Math.max(shadowDirty, 2);
+            if (shadowDirty > 0) { renderer.shadowMap.needsUpdate = true; shadowDirty--; }
             renderer.render(scene, camera);
         }
 
