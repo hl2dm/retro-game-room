@@ -4,10 +4,106 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#06050c">
+    <meta name="description" content="全 3D 懷舊電視遊樂器展示間：Mega Drive、超級任天堂、N64、PS2、Xbox 360，點擊卡帶即可開機。">
+<script>
+/* ===== i18n：zh（預設）/ ja。?lang=ja、/ja/ 路徑或瀏覽器語言為日文時切換 ===== */
+(function () {
+    var q = (location.search.match(/[?&]lang=(zh|ja)/) || [])[1];
+    var lang = window.__FORCE_LANG || q || (/^ja/i.test(navigator.language || '') ? 'ja' : 'zh');
+    window.__LANG = lang;
+    var JA = [
+        ['⚠ 載入失敗 / Script error', '⚠ 読み込みに失敗しました / Script error'],
+        ['請用 Chrome / Edge 開啟，並確認已啟用硬體加速 (WebGL)。', 'Chrome / Edge で開き、ハードウェアアクセラレーション（WebGL）が有効になっているか確認してください。'],
+        ['⚠ 此瀏覽器無法使用 WebGL', '⚠ このブラウザでは WebGL を利用できません'],
+        ['請改用 Chrome / Edge，並在設定中開啟「使用硬體加速」。', 'Chrome / Edge を使用し、設定で「ハードウェアアクセラレーションを使用する」をオンにしてください。'],
+        ['⚠ Three.js 未載入', '⚠ Three.js を読み込めませんでした'],
+        ['⚠ 3D 場景未啟動', '⚠ 3D シーンが起動しませんでした'],
+        ['請按 F12 查看 Console 錯誤。', 'F12 キーで Console のエラーを確認してください。'],
+        ['CRT TV POWER OFF // 點擊電視右下角紅色電源鍵開啟', 'CRT TV POWER OFF // テレビ右下の赤い電源ボタンで ON'],
+        ['請點擊電視前方 3D 主機上的「POWER 電源鍵」開機', 'テレビ前の本体の「POWER」ボタンを押して起動してください'],
+        [' 電源未開啟', ' の電源が入っていません'],
+        ['當前主機：', '現在の本体：'],
+        ['◀ 左側四層展示架：點擊 SEGA / SFC / N64 / PS2 交換主機', '◀ 左のラック：本体をクリックするとテレビ前の本体と入れ替え'],
+        ['▶ 右側收藏木箱：點擊 3D 卡帶或 PS2 DVD 自動配對並啟動', '▶ 右の木箱：カセット／ディスクをクリックで自動セット＆起動'],
+        ['● 點擊主機實體 POWER / EJECT 鍵控制電源與退卡/出匣', '● 本体の POWER / EJECT ボタンで電源・取り出し'],
+        ['復古綠罩檯燈 DESK LAMP', 'デスクランプ DESK LAMP'],
+        ['點擊開關房間暖光照明', 'クリックで暖色ライトを ON / OFF'],
+        ['立體聲監聽喇叭 AUDIO MONITOR', 'モニタースピーカー AUDIO MONITOR'],
+        ['點擊切換：音效開啟 / 靜音', 'クリックでサウンド ON / ミュート'],
+        ['左側：五層主機展示架', '左：5段ゲーム機ラック'],
+        ['點擊架上主機即可與電視前主機交換', 'ラックの本体をクリックでテレビ前と入れ替え'],
+        ['點擊銘牌：將此主機換到電視前', 'プレートをクリック：この本体をテレビ前へ'],
+        ['電視遊樂器展示架', 'ゲーム機ラック'],
+        ['CRT 顯像管電視螢幕', 'ブラウン管テレビ CRT'],
+        ['點擊拉近/切換電視特寫視角', 'クリックでテレビをアップ表示'],
+        ['電視電源鍵 TV POWER', 'テレビ電源 TV POWER'],
+        ['點擊開關 CRT 電視螢幕電源', 'クリックでテレビの電源を ON / OFF'],
+        ['訊號重整鍵 AV RESET', '入力リセット AV RESET'],
+        ['點擊重新載入當前遊戲開機畫面', 'クリックで起動画面を再表示'],
+        ['點擊切換主機電源 ON / OFF', 'クリックで本体の電源を ON / OFF'],
+        ['退出 EJECT [', '取り出し EJECT ['],
+        ['點擊開/關電動光碟托盤', 'クリックでディスクトレイを開閉'],
+        ['點擊退出卡帶', 'クリックでカセットを取り出す'],
+        ['RESET 重置鍵', 'RESET ボタン'],
+        ['點擊重新開機', 'クリックで再起動'],
+        ['VOLUME 音量滑桿', 'VOLUME 音量スライダー'],
+        ['點擊調整耳機音量刻度', 'クリックでヘッドホン音量を調整'],
+        ['在展示架上時：點擊與電視前主機交換', 'ラック上：クリックでテレビ前の本体と入れ替え'],
+        ['卡帶與光碟收藏箱', 'カセット＆ディスク収納箱'],
+        ['右側：雙排卡帶/光碟收藏木箱', '右：カセット／ディスク収納木箱'],
+        ['懸停檢視・點擊自動配對主機並開機', 'マウスで確認・クリックで対応本体に自動セット'],
+        [' // 點擊插入並自動開機', ' // クリックで挿入＆自動起動'],
+        ['切換主機中：', '本体を入れ替え中：'],
+        [' 已就緒', ' 準備OK'],
+        ['偵測到 ', ''],
+        ['，自動換上 ', ' を検出 → '],
+        ['》已歸還收藏箱', '』を収納箱に戻しました'],
+        ['退出：《', '取り出し：『'],
+        ['已插入：《', '挿入：『'],
+        ['光碟托盤已開啟 (OPEN)', 'ディスクトレイ OPEN'],
+        ['光碟托盤已關閉 (CLOSE)', 'ディスクトレイ CLOSE'],
+        ['卡帶插槽目前為空 (NO CARTRIDGE)', 'カセットが入っていません (NO CARTRIDGE)'],
+        ['訊號重置 (AV CHANNEL RESET)', '入力リセット (AV CHANNEL RESET)'],
+        ['主機電源開啟 (POWER ON)', '本体電源 ON (POWER ON)'],
+        ['主機電源關閉 (POWER OFF)', '本体電源 OFF (POWER OFF)'],
+        ['RESET 重新開機', 'RESET 再起動'],
+        ['書桌檯燈：開啟', 'デスクランプ：ON'],
+        ['書桌檯燈：關閉', 'デスクランプ：OFF'],
+        ['喇叭監聽：已靜音 (MUTE)', 'スピーカー：ミュート (MUTE)'],
+        ['喇叭監聽：音效開啟 (AUDIO ON)', 'スピーカー：サウンド ON (AUDIO ON)'],
+        ['點一下卡帶／光碟', 'カセット／ディスクをタップ'],
+        ['點擊卡帶／光碟', 'カセット／ディスクをクリック'],
+        ['自動換主機並開機・雙擊空白處回總覽', '本体を自動で切替＆起動・空白をダブルクリックで全体表示'],
+        ['16-BIT ROM 卡帶', '16-BIT ロムカセット'],
+        ['64-BIT ROM 卡帶', '64-BIT ロムカセット'],
+        ['DVD-ROM 光碟・直立', 'DVD-ROM・縦置き'],
+        ['DVD-DL 光碟', 'DVD-DL ディスク'],
+        ['卡帶', 'カセット'], ['光碟', 'ディスク'], ['《', '『'], ['》', '』']
+    ];
+    var cache = {};
+    window.__T = function (s) {
+        if (lang !== 'ja' || typeof s !== 'string' || !/[\u3400-\u9fff《》]/.test(s)) return s;
+        if (cache[s] !== undefined) return cache[s];
+        var o = s;
+        for (var i = 0; i < JA.length; i++) if (o.indexOf(JA[i][0]) >= 0) o = o.split(JA[i][0]).join(JA[i][1]);
+        return (cache[s] = o);
+    };
+    if (lang === 'ja') {
+        document.documentElement.lang = 'ja';
+        document.title = 'RETRO DECK 1995 // フル3D レトロゲーム部屋';
+        var P = CanvasRenderingContext2D.prototype, ft = P.fillText, st = P.strokeText, mt = P.measureText;
+        var fixFont = function (c) { if (c.font && c.font.indexOf('Noto Sans TC') >= 0) c.font = c.font.replace(/"?Noto Sans TC"?/g, '"Noto Sans JP", "Noto Sans TC"'); };
+        P.fillText = function (t) { fixFont(this); arguments[0] = window.__T(String(t)); return ft.apply(this, arguments); };
+        P.strokeText = function (t) { fixFont(this); arguments[0] = window.__T(String(t)); return st.apply(this, arguments); };
+        P.measureText = function (t) { fixFont(this); return mt.call(this, window.__T(String(t))); };
+    }
+})();
+</script>
+
     <title>RETRO DECK 1995 // 全 3D 沉浸式懷舊電視遊樂器展示間</title>
     <!-- Three.js r128 -->
     <script>
-(function(){function show(m){var d=document.getElementById('boot-overlay');if(!d){d=document.createElement('div');d.id='boot-overlay';d.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;background:#05060d;color:#7dd3fc;font:clamp(12px,3.6vw,16px)/1.5 monospace;text-align:center;word-break:break-word;padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))';(document.body||document.documentElement).appendChild(d);}d.innerHTML=m;}
+(function(){function show(m){var d=document.getElementById('boot-overlay');if(!d){d=document.createElement('div');d.id='boot-overlay';d.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;background:#05060d;color:#7dd3fc;font:clamp(12px,3.6vw,16px)/1.5 monospace;text-align:center;word-break:break-word;padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))';(document.body||document.documentElement).appendChild(d);}d.innerHTML=(window.__T?window.__T(m):m);}
 window.__bootShow=show;
 window.addEventListener('error',function(e){show('<b style="color:#f87171">⚠ 載入失敗 / Script error</b><br><br>'+(e.message||e)+'<br><br>請用 Chrome / Edge 開啟，並確認已啟用硬體加速 (WebGL)。');});
 document.addEventListener('DOMContentLoaded',function(){show('LOADING RETRO ROOM...');
@@ -25,7 +121,7 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
 
 </script>
     <!-- Google Fonts for 3D Canvas Texture Rendering -->
-    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Noto+Sans+TC:wght@500;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Noto+Sans+JP:wght@500;700;900&family=Noto+Sans+TC:wght@500;700;900&family=Press+Start+2P&display=swap" rel="stylesheet">
 
     <style>
         * {
@@ -135,6 +231,11 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
                 slot: new THREE.Vector3(0, 0.5, 1.5)
             }
         };
+        if (window.__LANG === 'ja') {
+            const N = { sega: ['メガドライブ 16-BIT', 'メガドライブ', 'メガドライブ'], sfc: ['スーパーファミコン', 'スーパーファミコン', 'スーパーファミコン'], n64: ['NINTENDO64', 'NINTENDO64', 'NINTENDO64'],
+                ps2: ['プレイステーション2 128-BIT', 'プレイステーション2', 'プレイステーション2（セラミック・ホワイト）'], x360: ['Xbox 360 HD-ERA', 'Xbox 360', 'Xbox 360'] };
+            Object.keys(N).forEach(k => { if (CONSOLE_SPECS[k]) { CONSOLE_SPECS[k].name = N[k][0]; CONSOLE_SPECS[k].shortName = N[k][1]; CONSOLE_SPECS[k].plate[0] = N[k][2]; } });
+        }
         function isDiscType(t) { return t === 'ps2' || t === 'x360'; }
         function getDeckPos(cid) { const o = CONSOLE_SPECS[cid] && CONSOLE_SPECS[cid].deckOffset; return o ? ACTIVE_DECK_POS.clone().add(o) : ACTIVE_DECK_POS.clone(); }
 
@@ -2864,8 +2965,17 @@ var t0=Date.now();(function chk(){var cv=document.querySelector('canvas');if(cv&
         }
 
         window.onload = function () {
-            initThreeWorld();
-            animate();
+            if (window.__LANG === 'ja') {
+                const TJ = { md_sonic: 'ソニック2 オマージュ版', md_sor2: 'ベア・ナックルII オマージュ版', sfc_chrono: 'クロノ・トリガー オマージュ版', sfc_srw4: '第4次ロボット大戦 オマージュ版',
+                    n64_sm64: 'スーパーマリオ64 オマージュ版', n64_zelda: '時のオカリナ オマージュ版', ps2_srwa3: 'ロボット大戦α3 オマージュ版', ps2_shutoko01: '首都高バトル01',
+                    x360_orbital: 'オービタル・ヴァンガード3 オマージュ版', x360_ironcog: 'アイアンコグ・ウォー オマージュ版' };
+                GAME_LIBRARY.forEach(g => { if (TJ[g.id]) g.title = TJ[g.id]; });
+            }
+            // 先載入日文/中文字型再繪製畫布文字，避免豆腐字
+            const fontReady = (document.fonts && document.fonts.load) ? Promise.race([
+                Promise.all(['700 34px "Noto Sans JP"', '900 34px "Noto Sans JP"', '400 20px "DotGothic16"', '700 34px "Noto Sans TC"'].map(f => document.fonts.load(f, 'あア字').catch(() => null))),
+                new Promise(r => setTimeout(r, 2500))]) : Promise.resolve();
+            fontReady.then(() => { initThreeWorld(); animate(); });
         };
     </script>
 </body>
